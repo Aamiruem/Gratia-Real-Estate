@@ -1,10 +1,21 @@
 import { ArrowUpRight, MapPin } from "lucide-react";
 import { Link } from "react-router-dom";
+import ShareButton from "./ShareButton";
 
 // `reasons` (optional): short labels from the recommender, e.g. "Similar budget".
 export default function ProjectCard({ project, reasons = [] }) {
   return (
-    <article className="group overflow-hidden rounded-2xl border border-black/10 bg-white shadow-luxury transition hover:-translate-y-1">
+    <article className="group relative overflow-hidden rounded-2xl border border-black/10 bg-white shadow-luxury transition hover:-translate-y-1">
+      {/* Outside the card link: a button may not sit inside a link. */}
+      <div className="absolute right-3 top-3 z-10">
+        <ShareButton
+          variant="overlay"
+          url={`${window.location.origin}/projects/${project.slug}`}
+          title={`${project.name}, ${project.location} | Gratia Estates`}
+          text={`${project.name} by ${project.developer}: ${project.status}, ${project.price}.`}
+          label="Share property"
+        />
+      </div>
       <Link to={`/projects/${project.slug}`} className="block">
         <div className="relative aspect-[16/10] overflow-hidden">
           <img

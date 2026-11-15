@@ -28,6 +28,8 @@ import CallIcon from "../components/CallIcon";
 import SEO from "../components/SEO";
 import { projects } from "../data/projects";
 import { formatWhatsAppMessage, openWhatsApp } from "../utils/whatsapp";
+import { saveLeadInBackground } from "../services/leadsApi";
+import { isValidPhone } from "../utils/leadValidation";
 
 const WHATSAPP_NUMBER = "919109776155";
 const PHONE = "+91 91097 76155";
@@ -427,8 +429,8 @@ function EnquiryForm() {
     const nextErrors = {};
 
     if (!form.name.trim()) nextErrors.name = "Please enter your name.";
-    if (!/^\+?[0-9]{10,15}$/.test(cleanPhone)) {
-      nextErrors.phone = "Enter a valid phone number (10–15 digits).";
+    if (!isValidPhone(cleanPhone)) {
+      nextErrors.phone = "Enter a valid 10-digit mobile number.";
     }
     if (form.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
       nextErrors.email = "Enter a valid email address.";
@@ -438,6 +440,16 @@ function EnquiryForm() {
       return;
     }
 
+    saveLeadInBackground("contact", {
+      name: form.name,
+      phone: form.phone,
+      email: form.email,
+      budget: form.budget,
+      location: form.location,
+      property_type: form.propertyType,
+      message: [form.timeline && `Buying timeline: ${form.timeline}`, form.message].filter(Boolean).join("
+"),
+    });
     openWhatsApp(
       formatWhatsAppMessage("🔑 *New Property Enquiry*", [
         [

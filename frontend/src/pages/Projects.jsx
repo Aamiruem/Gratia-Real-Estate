@@ -8,6 +8,7 @@ import {
   Scale,
   SlidersHorizontal,
   Wallet,
+  X,
 } from "lucide-react";
 import CallIcon from "../components/CallIcon";
 import { useEffect, useMemo, useState } from "react";
@@ -17,6 +18,9 @@ import ProjectCard from "../components/ProjectCard";
 import RecommendedProjects from "../components/RecommendedProjects";
 import SEO from "../components/SEO";
 import { projects } from "../data/projects";
+import PropertySearch from "../components/PropertySearch";
+import { openLeadDialog } from "../components/LeadDialog";
+import { BUDGET_RANGES, PROPERTY_TYPES, filterProjects } from "../utils/propertySearch";
 
 const filters = [
   "All",
@@ -49,8 +53,29 @@ const buyingTips = [
 
 export default function Projects() {
   // ?stage=... (used by the home page stage cards) preselects a filter.
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const requestedStage = searchParams.get("stage");
+  // ?location=&budget=&type=&q= come from the home page property search.
+  const search = {
+    location: searchParams.get("location") || "",
+    budget: searchParams.get("budget") || "",
+    type: searchParams.get("type") || "",
+    q: searchParams.get("q") || "",
+  };
+  const searchKey = `${search.location}|${search.budget}|${search.type}|${search.q}`;
+  const searched = useMemo(() => filterProjects(projects, search), [searchKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  const activeChips = [
+    search.location && { key: "location", label: search.location },
+    search.budget && { key: "budget", label: BUDGET_RANGES.find((r) => r.id === search.budget)?.label ?? search.budget },
+    search.type && { key: "type", label: PROPERTY_TYPES.find((t) => t.id === search.type)?.label ?? search.type },
+    search.q && { key: "q", label: `“${search.q}”` },
+  ].filter(Boolean);
+  const clearSearch = (key) => {
+    const next = new URLSearchParams(searchParams);
+    if (key) next.delete(key);
+    else ["location", "budget", "type", "q"].forEach((name) => next.delete(name));
+    setSearchParams(next, { replace: true });
+  };
   const [filter, setFilter] = useState(
     filters.includes(requestedStage) ? requestedStage : "All",
   );
@@ -61,11 +86,11 @@ export default function Projects() {
   }, [requestedStage]);
   const filtered = useMemo(
     () =>
-      filter === "All" ? projects : projects.filter((p) => p.status === filter),
-    [filter],
+      filter === "All" ? searched : searched.filter((p) => p.status === filter),
+    [filter, searched],
   );
   const countFor = (f) =>
-    f === "All" ? projects.length : projects.filter((p) => p.status === f).length;
+    f === "All" ? searched.length : searched.filter((p) => p.status === f).length;
 
   return (
     <>
@@ -119,8 +144,30 @@ export default function Projects() {
         }
       />
 
-      <section className="py-12 sm:py-16">
+      <section id="results" className="scroll-mt-24 py-12 sm:py-16">
         <div className="container-luxury">
+          <PropertySearch key={searchKey} initial={search} className="mb-6" compact />
+          {activeChips.length > 0 && (
+            <div className="mb-6 flex flex-wrap items-center gap-2">
+              <span className="text-xs font-bold uppercase tracking-[.12em] text-[#4b5966]">
+                {searched.length} {searched.length === 1 ? "match" : "matches"} for
+              </span>
+              {activeChips.map(({ key, label }) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => clearSearch(key)}
+                  className="inline-flex items-center gap-1.5 rounded-full bg-[#142536] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#263f57]"
+                  aria-label={`Remove filter ${label}`}
+                >
+                  {label} <X size={13} aria-hidden="true" />
+                </button>
+              ))}
+              <button type="button" onClick={() => clearSearch()} className="text-xs font-bold text-[#80602b] hover:underline">
+                Clear all
+              </button>
+            </div>
+          )}
           <div className="mb-8 flex flex-wrap items-center gap-2">
             <SlidersHorizontal size={18} className="mr-2 text-[#9a7940]" aria-hidden="true" />
             {filters.map((f) => (
@@ -146,8 +193,29 @@ export default function Projects() {
             ))}
           </div>
           {!filtered.length && (
-            <div className="rounded-2xl border border-dashed border-[#d9dce0] bg-white py-16 text-center text-[#5e6872]">
-              No projects match this filter yet.
+            <div className="rounded-2xl border border-dashed border-[#d9dce0] bg-white px-6 py-14 text-center">
+              <p className="font-semibold text-[#142536]">
+                {search.type === "commercial"
+                  ? "Commercial listings are shared on request."
+                  : "No listed projects match these filters yet."}
+              </p>
+              <p className="mx-auto mt-2 max-w-md text-sm text-[#4b5966]">
+                Our advisors often know of options that aren't listed here. Tell us what you need and we'll send matching properties.
+              </p>
+              <button
+                type="button"
+                onClick={() =>
+                  openLeadDialog({
+                    kind: "consultation",
+                    service: [search.type && PROPERTY_TYPES.find((t) => t.id === search.type)?.label, search.location, search.budget && BUDGET_RANGES.find((r) => r.id === search.budget)?.label]
+                      .filter(Boolean)
+                      .join(", ") || "Help finding a property",
+                  })
+                }
+                className="mt-5 inline-flex items-center gap-2 rounded-full bg-[#142536] px-5 py-3 text-xs font-bold uppercase tracking-[.1em] text-white hover:bg-[#c9a45c] hover:text-[#142536]"
+              >
+                Ask an advisor <ArrowRight size={15} aria-hidden="true" />
+              </button>
             </div>
           )}
         </div>

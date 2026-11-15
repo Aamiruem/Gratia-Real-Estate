@@ -33,6 +33,8 @@ import {
 } from "../components/home/HomeSections";
 import { projects as projectData } from "../data/projects";
 import { formatWhatsAppMessage, openWhatsApp } from "../utils/whatsapp";
+import { saveLeadInBackground } from "../services/leadsApi";
+import { isValidPhone } from "../utils/leadValidation";
 
 const WHATSAPP_NUMBER = "919109776155";
 const PHONE_NUMBER = "+919109776155";
@@ -121,7 +123,9 @@ function HomeContactPopup() {
     event.preventDefault();
 
     const cleanPhone = phone.replace(/\D/g, "");
-    if (cleanPhone.length !== 10) return;
+    if (cleanPhone.length !== 10 || !isValidPhone(cleanPhone)) return;
+
+    saveLeadInBackground("whatsapp", { name, phone: cleanPhone, message: requirement });
 
     openWhatsApp(
       formatWhatsAppMessage("🏠 *New Website Enquiry*", [

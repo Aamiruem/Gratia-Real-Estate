@@ -28,6 +28,11 @@ import VideoActions, { VideoInfo } from "../components/VideoActions";
 import { authApi } from "../services/authApi";
 import { projects } from "../data/projects";
 import { formatWhatsAppMessage, openWhatsApp } from "../utils/whatsapp";
+import { saveLeadInBackground } from "../services/leadsApi";
+import { isValidPhone } from "../utils/leadValidation";
+import { toast } from "../components/Toaster";
+import ShareButton from "../components/ShareButton";
+import { openLeadDialog } from "../components/LeadDialog";
 import { recordProjectView, similarProjects } from "../utils/recommender";
 import { SITE_URL } from "../config/site";
 import {
@@ -129,6 +134,18 @@ export default function ProjectDetails() {
 
   const submitCallbackRequest = (event) => {
     event.preventDefault();
+    if (!isValidPhone(callbackRequest.phone)) {
+      toast("Please enter a valid 10-digit mobile number.", "error");
+      return;
+    }
+    saveLeadInBackground("callback", {
+      name: callbackRequest.name,
+      phone: callbackRequest.phone,
+      budget: callbackRequest.budget,
+      property_slug: project.slug,
+      property_name: `${project.name}, ${project.location}`,
+      message: callbackRequest.description,
+    });
     openWhatsApp(
       formatWhatsAppMessage("📲 *Callback Request*", [
         [
@@ -212,6 +229,23 @@ export default function ProjectDetails() {
                   <CircleCheck size={14} aria-hidden="true" />
                   {project.status}
               </span>
+              <div className="flex w-full flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => openLeadDialog({ kind: "property_enquiry", project })}
+                  className="inline-flex items-center gap-2 rounded-full bg-[#142536] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#c9a45c] hover:text-[#142536]"
+                >
+                  Enquire about this property
+                </button>
+                <ShareButton
+                  variant="pill"
+                  align="left"
+                  label="Share property"
+                  url={`${SITE_URL}/projects/${project.slug}`}
+                  title={`${project.name}, ${project.location} | Gratia Estates`}
+                  text={`${project.name} by ${project.developer}: ${project.status}, ${project.price}.`}
+                />
+              </div>
             </div>
             <div className="relative isolate overflow-hidden rounded-3xl bg-charcoal shadow-luxury">
               <img

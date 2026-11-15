@@ -28,6 +28,8 @@ import CallIcon from "../components/CallIcon";
 import SEO from "../components/SEO";
 import { projects } from "../data/projects";
 import { formatWhatsAppMessage, openWhatsApp } from "../utils/whatsapp";
+import { saveLeadInBackground } from "../services/leadsApi";
+import { isValidPhone } from "../utils/leadValidation";
 
 const WHATSAPP_NUMBER = "919109776155";
 const SLOTS = [
@@ -109,6 +111,7 @@ export default function BookVisit() {
   });
   const [errors, setErrors] = useState({});
   const [sent, setSent] = useState(false);
+  const [reference, setReference] = useState("");
   const [stepNotice, setStepNotice] = useState("");
   const wizardRef = useRef(null);
   const stepsRef = useRef(null);
@@ -121,7 +124,7 @@ export default function BookVisit() {
 
   // Which steps are filled in. Every step can be opened at any time; this only
   // drives the ticks on the step bar and the "missing" hints on Review.
-  const phoneValid = /^\+?[0-9]{10,15}$/.test(booking.phone.replace(/[\s()-]/g, ""));
+  const phoneValid = isValidPhone(booking.phone);
   const complete = {
     1: Boolean(booking.project),
     2: Boolean(booking.date && booking.slot && (booking.slot !== "custom" || booking.customTime)),
@@ -200,6 +203,20 @@ export default function BookVisit() {
     ]);
     openWhatsApp(message, WHATSAPP_NUMBER);
     setSent(true);
+    setReference("");
+    // Saved to the lead system in parallel; WhatsApp is never delayed.
+    saveLeadInBackground("visit", {
+      name: booking.name,
+      phone: booking.phone,
+      property_slug: project?.slug,
+      property_name: project ? `${project.name}, ${project.location}` : "Help me choose",
+      visit_date: day?.iso,
+      visit_time: timeText,
+      visitors: booking.group,
+      contact_method: booking.contactBy,
+      message: [booking.notes, booking.question && `Question: ${booking.question}`].filter(Boolean).join("
+"),
+    }).then((result) => result?.reference && setReference(result.reference));
   };
 
   return (
@@ -311,6 +328,11 @@ export default function BookVisit() {
                   WhatsApp has opened with your visit request. Please tap <strong>send</strong> there,
                   and our team will get in touch to confirm your visit. We look forward to meeting you.
                 </p>
+                {reference && (
+                  <p className="mt-3 text-sm text-[#263746]">
+                    Your visit reference: <strong className="font-mono tracking-wide">{reference}</strong>
+                  </p>
+                )}
                 <div className="mt-6 flex flex-wrap justify-center gap-3">
                   <Link to="/blog/site-visit-checklist-gurgaon" className="inline-flex items-center gap-2 rounded-full bg-[#142536] px-5 py-3 text-sm font-semibold text-white hover:bg-emerald-700">
                     Read the site visit checklist <ArrowRight size={15} aria-hidden="true" />
