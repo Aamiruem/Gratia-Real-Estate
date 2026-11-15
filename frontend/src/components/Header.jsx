@@ -86,7 +86,7 @@ export default function Header() {
                   to={to}
                   end={to === "/"}
                   className={({ isActive }) =>
-                    `group inline-flex items-center gap-2 rounded-full py-1.5 pl-1.5 pr-4 text-[13px] font-semibold transition ${isActive ? "bg-[#142536] text-white shadow-md" : "text-[#263746] hover:bg-white hover:shadow-sm"}`
+                    `group inline-flex items-center gap-2 whitespace-nowrap rounded-full py-1.5 pl-1.5 pr-4 text-[13px] font-semibold transition ${isActive ? "bg-[#142536] text-white shadow-md" : "text-[#263746] hover:bg-white hover:shadow-sm"}`
                   }
                 >
                   {({ isActive }) => (
@@ -122,7 +122,7 @@ export default function Header() {
           <div className="flex items-center gap-1.5 sm:gap-2">
             <SiteSearch className="h-11 justify-center px-3 lg:px-4" />
             <InstallAppButton variant="header" />
-            <div className="hidden sm:block">
+            <div className="hidden sm:block xl:hidden min-[1440px]:block 2xl:hidden min-[1600px]:block">
               <ShareButton
                 title="Gratia Estates | Premium Real Estate Advisory in Gurgaon"
                 text="Explore Gurgaon residential projects with Gratia Estates."
@@ -146,7 +146,7 @@ export default function Header() {
             </a>
             <Link
               to="/book-visit"
-              className="hidden items-center gap-2 rounded-full bg-[#c9a45c] px-5 py-3 text-xs font-bold uppercase tracking-[.1em] text-[#142536] shadow-[0_6px_18px_rgba(201,164,92,.4)] transition hover:-translate-y-0.5 hover:bg-[#e1c98f] sm:inline-flex"
+              className="hidden items-center gap-2 whitespace-nowrap rounded-full bg-[#c9a45c] px-5 py-3 text-xs font-bold uppercase tracking-[.1em] text-[#142536] shadow-[0_6px_18px_rgba(201,164,92,.4)] transition hover:-translate-y-0.5 hover:bg-[#e1c98f] sm:inline-flex"
             >
               <CalendarCheck size={16} aria-hidden="true" /> Book a visit
             </Link>

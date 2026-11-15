@@ -15,6 +15,19 @@ export default defineConfig(({ mode }) => {
       },
     ],
     define: { __SITE_URL__: JSON.stringify(SITE_URL) },
+    build: {
+      rollupOptions: {
+        output: {
+          // React rarely changes: a separate file stays cached across deploys.
+          manualChunks(id) {
+            if (/[\\/]node_modules[\\/](react|react-dom|scheduler|react-router|react-router-dom|turbo-stream|cookie|set-cookie-parser)[\\/]/.test(id)) {
+              return "react";
+            }
+            return undefined;
+          },
+        },
+      },
+    },
     server: {
       port: 5173,
       host: true,

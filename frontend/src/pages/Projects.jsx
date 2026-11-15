@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import CallIcon from "../components/CallIcon";
 import { useEffect, useMemo, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useSearchParams } from "react-router-dom";
 import PageHero from "../components/PageHero";
 import ProjectCard from "../components/ProjectCard";
 import RecommendedProjects from "../components/RecommendedProjects";
@@ -79,6 +79,13 @@ export default function Projects() {
   const [filter, setFilter] = useState(
     filters.includes(requestedStage) ? requestedStage : "All",
   );
+  // Searches from the home page link to #results: show the matches directly.
+  const location = useLocation();
+  useEffect(() => {
+    if (location.hash === "#results") {
+      document.getElementById("results")?.scrollIntoView({ block: "start" });
+    }
+  }, [location.key, location.hash]);
   // Follow ?stage= changes too (e.g. picking a stage from the nav dropdown
   // while already on this page).
   useEffect(() => {

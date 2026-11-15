@@ -131,7 +131,7 @@ export default function SiteSearch({ className = "" }) {
         className={`inline-flex items-center gap-2 rounded-full border border-[#e7e2d8] bg-[#f8f6f1] text-[#142536] transition hover:border-[#c9a45c] hover:text-[#9a7940] ${className}`}
       >
         <Search size={18} strokeWidth={2} aria-hidden="true" />
-        <span className="hidden text-[13px] font-semibold lg:inline">Search</span>
+        <span className="hidden text-[13px] font-semibold lg:inline xl:hidden min-[1440px]:inline">Search</span>
         <kbd className="hidden rounded-md border border-[#e7e2d8] bg-white px-1.5 py-0.5 text-[10px] font-semibold text-[#68737e] 2xl:inline">Ctrl K</kbd>
       </button>
 

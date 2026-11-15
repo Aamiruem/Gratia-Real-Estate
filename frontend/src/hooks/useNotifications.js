@@ -1,5 +1,6 @@
 import { useEffect, useSyncExternalStore } from "react";
 import { notificationsApi } from "../services/notificationsApi";
+import { toast } from "../components/Toaster";
 
 /*
  * One shared notification store for the bell and the notifications page.
@@ -156,7 +157,7 @@ async function refresh() {
         items.filter((item) => item.id > latestSeen).reverse().forEach(showSystemAlert);
         const fresh = items.filter((item) => item.id > latestSeen && item.audience === "owner");
         if (fresh.length && document.visibilityState === "visible") {
-          import("../components/Toaster").then(({ toast }) => toast(fresh[0].title, "info"));
+          toast(fresh[0].title, "info");
         }
       }
       latestSeen = Math.max(latestSeen ?? 0, feed?.latest_id ?? 0, ...items.map((item) => item.id));

@@ -127,8 +127,9 @@ function InstallDialog({ onClose }) {
 }
 
 const VARIANTS = {
+  // Icon-only until the header has room for the label (2xl), so the nav never wraps.
   header:
-    "hidden h-11 items-center gap-2 rounded-full border border-[#e7e2d8] bg-white px-3.5 text-xs font-bold text-[#142536] transition hover:border-[#c9a45c] hover:text-[#80602b] lg:inline-flex",
+    "hidden size-11 items-center justify-center gap-2 whitespace-nowrap rounded-full border border-[#e7e2d8] bg-white text-xs font-bold text-[#142536] transition hover:border-[#c9a45c] hover:text-[#80602b] sm:inline-flex xl:hidden min-[1440px]:inline-flex min-[1800px]:w-auto min-[1800px]:px-3.5",
   menu: "flex w-full items-center justify-center gap-2 rounded-full border border-[#142536] bg-white px-4 py-3 text-sm font-bold text-[#142536]",
   footer:
     "inline-flex items-center gap-2 rounded-full border border-white/20 px-4 py-2 text-xs font-bold text-white transition hover:border-[#e1c98f] hover:text-[#e1c98f]",
@@ -156,13 +157,20 @@ export default function InstallAppButton({ variant = "header", className = "" })
 
   return (
     <>
-      <button type="button" onClick={onClick} className={`${VARIANTS[variant]} ${className}`}>
+      <button
+        type="button"
+        onClick={onClick}
+        title={variant === "header" ? "Install the Gratia Estates app" : undefined}
+        className={`${VARIANTS[variant]} ${className}`}
+      >
         {installed && !canPrompt ? (
           <CheckCircle2 size={16} className="text-emerald-600" aria-hidden="true" />
         ) : (
           <Download size={16} aria-hidden="true" />
         )}
-        {installed && !canPrompt ? "App installed" : "Install App"}
+        <span className={variant === "header" ? "sr-only min-[1800px]:not-sr-only" : undefined}>
+          {installed && !canPrompt ? "App installed" : "Install App"}
+        </span>
       </button>
       {showHelp && <InstallDialog onClose={() => setShowHelp(false)} />}
     </>

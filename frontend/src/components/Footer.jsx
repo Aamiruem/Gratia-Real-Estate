@@ -1,9 +1,14 @@
-import { ArrowUpRight, Lock, Mail, MapPin } from "lucide-react";
+import { ArrowUpRight, Facebook, Instagram, Linkedin, Lock, Mail, MapPin, Twitter, Youtube } from "lucide-react";
 import { Link } from "react-router-dom";
 import { projects } from "../data/projects";
 import CallIcon from "./CallIcon";
 import Logo from "./Logo";
-import { footerLegalLinks } from "./footer/footerData";
+import { footerLegalLinks, footerSocialLinks } from "./footer/footerData";
+import InstallAppButton from "./InstallAppButton";
+import ShareButton from "./ShareButton";
+
+const SOCIAL_ICONS = { Instagram, Facebook, YouTube: Youtube, LinkedIn: Linkedin, "X (Twitter)": Twitter };
+const socials = footerSocialLinks.filter((link) => link.href);
 
 const quickLinks = [
   { label: "Home", to: "/" },
@@ -48,6 +53,39 @@ export default function Footer() {
               new-launch, under-construction and ready-to-move homes with one
               advisor from shortlist to site visit.
             </p>
+            {socials.length > 0 && (
+              <ul className="mt-5 flex flex-wrap gap-2" aria-label="Gratia Estates on social media">
+                {socials.map(({ label, href }) => {
+                  const Icon = SOCIAL_ICONS[label] ?? ArrowUpRight;
+                  return (
+                    <li key={label}>
+                      <a
+                        href={href}
+                        target="_blank"
+                        rel="noreferrer"
+                        aria-label={label}
+                        title={label}
+                        className="grid size-10 place-items-center rounded-full border border-white/15 text-white/80 transition hover:border-[#e1c98f] hover:bg-[#e1c98f] hover:text-[#0f1f2e]"
+                      >
+                        <Icon size={17} aria-hidden="true" />
+                      </a>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+            <div className="mt-5 flex flex-wrap gap-2">
+              <InstallAppButton variant="footer" />
+              <ShareButton
+                variant="pill"
+                align="left"
+                label="Share website"
+                className="!border-white/20 !bg-transparent !px-4 !py-2 !text-xs !font-bold !text-white hover:!border-[#e1c98f] hover:!text-[#e1c98f]"
+                title="Gratia Estates | Premium Real Estate Advisory in Gurgaon"
+                text="Explore Gurgaon residential projects with Gratia Estates."
+                url={typeof window !== "undefined" ? window.location.origin : undefined}
+              />
+            </div>
           </div>
 
           <nav aria-label="Footer">

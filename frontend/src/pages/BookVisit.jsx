@@ -214,8 +214,7 @@ export default function BookVisit() {
       visit_time: timeText,
       visitors: booking.group,
       contact_method: booking.contactBy,
-      message: [booking.notes, booking.question && `Question: ${booking.question}`].filter(Boolean).join("
-"),
+      message: [booking.notes, booking.question && `Question: ${booking.question}`].filter(Boolean).join(" | "),
     }).then((result) => result?.reference && setReference(result.reference));
   };
 

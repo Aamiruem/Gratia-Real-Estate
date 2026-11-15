@@ -31,6 +31,16 @@ import {
   StatsBand,
   VideoTeaser,
 } from "../components/home/HomeSections";
+import {
+  AboutSnapshot,
+  ContactAndMap,
+  HomePropertySearch,
+  NewLaunches,
+  PropertyCategories,
+  ServicesSection,
+  Testimonials,
+  WhyChooseUs,
+} from "../components/home/HomeExtras";
 import { projects as projectData } from "../data/projects";
 import { formatWhatsAppMessage, openWhatsApp } from "../utils/whatsapp";
 import { saveLeadInBackground } from "../services/leadsApi";
@@ -589,6 +599,8 @@ export default function Home() {
         </div>
       </section>
 
+      <HomePropertySearch />
+
       <StatsBand />
 
       <section className="py-12 sm:py-16">
@@ -646,9 +658,17 @@ export default function Home() {
 
       <RecommendedProjects className="pb-12 sm:pb-16" />
 
+      <PropertyCategories />
+
+      <ServicesSection />
+
+      <NewLaunches />
+
       <BrowseByStage />
 
       <VideoTeaser />
+
+      <WhyChooseUs />
 
       <JourneySection />
 
@@ -656,9 +676,15 @@ export default function Home() {
 
       <AmenitiesShowcase />
 
+      <AboutSnapshot />
+
+      <Testimonials />
+
       <LatestInsights />
 
       <HomeFaq />
+
+      <ContactAndMap />
 
       <ShortlistCTA />
     </>

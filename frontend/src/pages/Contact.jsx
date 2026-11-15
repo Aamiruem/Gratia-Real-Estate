@@ -447,8 +447,7 @@ function EnquiryForm() {
       budget: form.budget,
       location: form.location,
       property_type: form.propertyType,
-      message: [form.timeline && `Buying timeline: ${form.timeline}`, form.message].filter(Boolean).join("
-"),
+      message: [form.timeline && `Buying timeline: ${form.timeline}`, form.message].filter(Boolean).join(" | "),
     });
     openWhatsApp(
       formatWhatsAppMessage("🔑 *New Property Enquiry*", [
