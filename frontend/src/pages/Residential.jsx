@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight, Building2, CalendarCheck, Home as HomeIcon, MapPin, PhoneCall } from "lucide-react";
 import SEO from "../components/SEO";
@@ -24,6 +24,11 @@ export default function Residential() {
   const version = usePropertiesVersion();
   const [filter, setFilter] = useState("residential");
   const homes = useMemo(() => projects.filter((p) => !isCommercial(p)), [version]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!FILTERS.some((item) => item.id === filter)) setFilter("residential");
+  }, [filter]);
+
   const shown = homes.filter((p) => matchesType(p, filter));
   const sectors = new Set(homes.map((p) => p.location)).size;
 

@@ -30,10 +30,21 @@ export default function VideoAdminAuth() {
     authApi
       .otpOptions()
       .then((options) => {
+        const availableChannel = options.email
+          ? "email"
+          : options.phone
+            ? "phone"
+            : options.whatsapp
+              ? "whatsapp"
+              : "email";
+
         setOtpOptions(options);
         setOtpOptionsError("");
         setOtpOptionsLoaded(true);
-        if (!options.email && options.phone) setOtpChannel("phone");
+
+        if (options[availableChannel]) {
+          setOtpChannel((current) => (options[current] ? current : availableChannel));
+        }
         if (options.owner_configured === false) {
           setOtpOptionsError("No owner account is set up yet. Add VIDEO_ADMIN_EMAIL to the backend settings and restart it.");
         }
