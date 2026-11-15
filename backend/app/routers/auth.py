@@ -210,7 +210,13 @@ def login(data: LoginRequest, request: Request, db: Session = Depends(get_db)):
         if not otp.email_otp_available():
             raise HTTPException(status_code=503, detail="Email OTP is not configured.")
         if owner.email.lower() != email:
-            raise HTTPException(status_code=401, detail="This email is not registered as the owner.")
+            # Team members added in the admin panel (Users) sign in by email code.
+            member = db.scalar(
+                select(User).where(func.lower(User.email) == email, User.role.in_(("admin", "agent")))
+            )
+            if member is None:
+                raise HTTPException(status_code=401, detail="This email is not registered for sign-in.")
+            owner = member
 
     if not owner.is_active:
         raise HTTPException(status_code=403, detail="User account is inactive")

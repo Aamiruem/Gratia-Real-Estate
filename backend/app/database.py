@@ -41,7 +41,12 @@ def get_db():
 
 def create_tables():
     from .models import (  # noqa: F401
+        AnalyticsEvent,
         EmailChangeChallenge,
+        FollowUp,
+        Property,
+        PushSubscription,
+        SiteSetting,
         Lead,
         LoginChallenge,
         Notification,
@@ -53,3 +58,6 @@ def create_tables():
     )
 
     Base.metadata.create_all(bind=engine)
+    from .migrate import add_missing_columns
+
+    add_missing_columns(engine, Base.metadata)

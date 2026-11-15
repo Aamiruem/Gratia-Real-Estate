@@ -31,7 +31,8 @@ from app.models import LoginChallenge  # noqa: E402
 
 @pytest.fixture()
 def client():
-    with TestClient(app) as test_client:
+    # Our frontend sends this header on every API call (CSRF protection).
+    with TestClient(app, headers={"X-Requested-With": "fetch"}) as test_client:
         yield test_client
     with SessionLocal() as db:
         db.query(LoginChallenge).delete()

@@ -22,12 +22,14 @@ from sqlalchemy.orm import Session
 
 from .. import notifications, ratelimit
 from ..database import get_db
-from ..models import Lead, User
-from .videos import require_video_admin
+from ..models import FollowUp, Lead, Notification, User
+from ..permissions import require_any_staff, require_manager, staff_role
 
 router = APIRouter(prefix="/leads", tags=["Leads"])
 
 LeadKind = Literal["contact", "visit", "callback", "property_enquiry", "consultation", "whatsapp"]
+Requirement = Literal["buy", "sell", "rent", "invest"]
+SOURCES = {"organic", "direct", "social", "referral", "paid", "email", "whatsapp", "app"}
 APPOINTMENT_KINDS = {"visit", "consultation"}
 LEAD_STATUSES = ("new", "contacted", "qualified", "converted", "lost")
 VISIT_STATUSES = ("requested", "confirmed", "rescheduled", "completed", "cancelled", "no_show")
@@ -84,6 +86,9 @@ class LeadCreate(BaseModel):
     contact_method: Optional[str] = Field(default=None, max_length=20)
     message: str = Field(default="", max_length=2000)
     source_page: Optional[str] = Field(default=None, max_length=200)
+    requirement: Optional[Requirement] = None
+    contact_time: Optional[str] = Field(default=None, max_length=60)
+    source: Optional[str] = Field(default=None, max_length=60)
     # Honeypot: hidden from people, bots tend to fill it.
     website: Optional[str] = Field(default=None, max_length=200)
 
@@ -135,6 +140,11 @@ class LeadResponse(BaseModel):
     message: str
     source_page: Optional[str]
     owner_notes: str
+    requirement: Optional[str] = None
+    contact_time: Optional[str] = None
+    source: Optional[str] = None
+    assigned_to_id: Optional[int] = None
+    follow_up_at: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
 
@@ -149,6 +159,26 @@ class LeadUpdate(BaseModel):
     owner_notes: Optional[str] = Field(default=None, max_length=5000)
     visit_date: Optional[date] = None
     visit_time: Optional[str] = Field(default=None, max_length=60)
+    # 0 = unassign
+    assigned_to_id: Optional[int] = Field(default=None, ge=0)
+    follow_up_at: Optional[datetime] = None
+    clear_follow_up: bool = False
+
+
+class FollowUpCreate(BaseModel):
+    note: str = Field(min_length=2, max_length=3000)
+    next_action_at: Optional[datetime] = None
+    status: Optional[str] = Field(default=None, max_length=20)
+
+
+class FollowUpResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    author_name: str
+    note: str
+    next_action_at: Optional[datetime]
+    created_at: datetime
 
 
 def new_reference(db: Session) -> str:
@@ -239,6 +269,9 @@ def create_lead(
         contact_method=clean(payload.contact_method, 20),
         message=clean(payload.message, 2000) or "",
         source_page=clean(payload.source_page, 200),
+        requirement=payload.requirement,
+        contact_time=clean(payload.contact_time, 60),
+        source=payload.source if payload.source in SOURCES else ("direct" if payload.source else None),
     )
     db.add(lead)
     db.flush()
@@ -248,12 +281,12 @@ def create_lead(
         title = f"New enquiry about {lead.property_name}"
     body = _summary(lead)
     link = f"/admin/leads?lead={lead.reference}"
-    notifications.create(
+    item = notifications.create(
         db, audience="owner", kind=f"lead.{payload.kind}", title=title, body=body, link=link, lead_reference=lead.reference
     )
     db.commit()
     db.refresh(lead)
-    notifications.bump()
+    notifications.dispatch(background, [item])
     background.add_task(notifications.push_to_owner_phone, f"{title} · {lead.reference}", body, link)
 
     return LeadCreated(reference=lead.reference, kind=lead.kind, status=lead.status, created_at=lead.created_at)
@@ -296,7 +329,7 @@ def list_leads(
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
-    _owner: User = Depends(require_video_admin),
+    _staff: User = Depends(require_any_staff),
 ):
     query = _filtered(kind, status_, q, upcoming)
     total = db.scalar(select(func.count()).select_from(query.subquery())) or 0
@@ -306,7 +339,7 @@ def list_leads(
 
 
 @router.get("/stats")
-def lead_stats(db: Session = Depends(get_db), _owner: User = Depends(require_video_admin)):
+def lead_stats(db: Session = Depends(get_db), _staff: User = Depends(require_any_staff)):
     today = date.today()
     week_ago = datetime.now(timezone.utc) - timedelta(days=7)
     by_kind = dict(db.execute(select(Lead.kind, func.count()).group_by(Lead.kind)).all())
@@ -335,7 +368,7 @@ def lead_stats(db: Session = Depends(get_db), _owner: User = Depends(require_vid
 EXPORT_FIELDS = (
     "reference", "created_at", "kind", "status", "name", "phone", "email", "property_name", "property_slug",
     "location", "budget", "property_type", "visit_date", "visit_time", "visitors", "contact_method",
-    "message", "owner_notes", "source_page",
+    "message", "owner_notes", "source_page", "requirement", "contact_time", "source", "follow_up_at",
 )
 
 
@@ -343,7 +376,7 @@ EXPORT_FIELDS = (
 def export_leads(
     kind: Optional[str] = Query(default=None, max_length=30),
     db: Session = Depends(get_db),
-    _owner: User = Depends(require_video_admin),
+    _staff: User = Depends(require_any_staff),
 ):
     rows = db.scalars(_filtered(kind, None, None, False).order_by(Lead.created_at.desc())).all()
     buffer = io.StringIO()
@@ -365,6 +398,57 @@ def export_leads(
     )
 
 
+@router.get("/follow-ups/due", response_model=LeadList)
+def due_follow_ups(
+    scope: Literal["overdue", "today", "upcoming", "all"] = "all",
+    db: Session = Depends(get_db),
+    _staff: User = Depends(require_any_staff),
+):
+    """Leads with a scheduled follow-up, soonest first."""
+    now = datetime.now(timezone.utc)
+    start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    query = select(Lead).where(Lead.follow_up_at.is_not(None))
+    if scope == "overdue":
+        query = query.where(Lead.follow_up_at < now)
+    elif scope == "today":
+        query = query.where(Lead.follow_up_at >= start, Lead.follow_up_at < start + timedelta(days=1))
+    elif scope == "upcoming":
+        query = query.where(Lead.follow_up_at >= now)
+    items = db.scalars(query.order_by(Lead.follow_up_at.asc()).limit(200)).all()
+    return LeadList(items=items, total=len(items))
+
+
+def create_due_follow_up_notifications(db: Session) -> list[Notification]:
+    """Adds one "Follow-up due" notification per lead whose follow-up time has passed."""
+    now = datetime.now(timezone.utc)
+    due = db.scalars(select(Lead).where(Lead.follow_up_at.is_not(None), Lead.follow_up_at <= now).limit(100)).all()
+    created = []
+    for lead in due:
+        follow_up_at = lead.follow_up_at if lead.follow_up_at.tzinfo else lead.follow_up_at.replace(tzinfo=timezone.utc)
+        exists = db.scalar(
+            select(Notification.id).where(
+                Notification.kind == "lead.follow_up",
+                Notification.lead_reference == lead.reference,
+                Notification.created_at >= follow_up_at,
+            )
+        )
+        if not exists:
+            created.append(
+                notifications.create(
+                    db,
+                    audience="owner",
+                    kind="lead.follow_up",
+                    title=f"Follow-up due: {lead.name}",
+                    body=f"{lead.reference} · {lead.phone}",
+                    link=f"/admin/leads?lead={lead.reference}",
+                    lead_reference=lead.reference,
+                )
+            )
+    if created:
+        db.commit()
+    return created
+
+
 def _get(reference: str, db: Session) -> Lead:
     lead = db.scalars(select(Lead).where(Lead.reference == reference.upper())).first()
     if lead is None:
@@ -373,7 +457,7 @@ def _get(reference: str, db: Session) -> Lead:
 
 
 @router.get("/{reference}", response_model=LeadResponse)
-def get_lead(reference: str, db: Session = Depends(get_db), _owner: User = Depends(require_video_admin)):
+def get_lead(reference: str, db: Session = Depends(get_db), _staff: User = Depends(require_any_staff)):
     return _get(reference, db)
 
 
@@ -382,9 +466,21 @@ def update_lead(
     reference: str,
     payload: LeadUpdate,
     db: Session = Depends(get_db),
-    _owner: User = Depends(require_video_admin),
+    _staff: User = Depends(require_any_staff),
 ):
     lead = _get(reference, db)
+    if payload.assigned_to_id is not None:
+        if payload.assigned_to_id == 0:
+            lead.assigned_to_id = None
+        else:
+            member = db.get(User, payload.assigned_to_id)
+            if member is None or staff_role(member) is None:
+                raise HTTPException(status_code=422, detail="Choose an active team member.")
+            lead.assigned_to_id = member.id
+    if payload.clear_follow_up:
+        lead.follow_up_at = None
+    elif payload.follow_up_at is not None:
+        lead.follow_up_at = payload.follow_up_at
     if payload.status is not None:
         allowed = VISIT_STATUSES if lead.kind in APPOINTMENT_KINDS else LEAD_STATUSES
         if payload.status not in allowed:
@@ -399,3 +495,36 @@ def update_lead(
     db.commit()
     db.refresh(lead)
     return lead
+
+
+@router.get("/{reference}/follow-ups", response_model=list[FollowUpResponse])
+def list_follow_ups(reference: str, db: Session = Depends(get_db), _staff: User = Depends(require_any_staff)):
+    lead = _get(reference, db)
+    return db.scalars(select(FollowUp).where(FollowUp.lead_id == lead.id).order_by(FollowUp.created_at.desc())).all()
+
+
+@router.post("/{reference}/follow-ups", response_model=FollowUpResponse, status_code=status.HTTP_201_CREATED)
+def add_follow_up(
+    reference: str,
+    payload: FollowUpCreate,
+    db: Session = Depends(get_db),
+    staff: User = Depends(require_any_staff),
+):
+    lead = _get(reference, db)
+    if payload.status is not None:
+        allowed = VISIT_STATUSES if lead.kind in APPOINTMENT_KINDS else LEAD_STATUSES
+        if payload.status not in allowed:
+            raise HTTPException(status_code=422, detail=f"Status must be one of: {', '.join(allowed)}")
+        lead.status = payload.status
+    entry = FollowUp(
+        lead_id=lead.id,
+        author_id=staff.id,
+        author_name=staff.name,
+        note=clean(payload.note, 3000) or "",
+        next_action_at=payload.next_action_at,
+    )
+    lead.follow_up_at = payload.next_action_at
+    db.add(entry)
+    db.commit()
+    db.refresh(entry)
+    return entry

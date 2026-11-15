@@ -56,6 +56,18 @@ def create(
     return item
 
 
+def dispatch(background, items: list[Notification]) -> None:
+    """Call after commit: wakes live listeners and queues Web Push for each item."""
+    from . import push
+
+    bump()
+    if background is None or not push.configured():
+        return
+    for item in items:
+        audience = "public" if item.audience == "public" else "staff"
+        background.add_task(push.send, audience, item.title, item.body, item.link, f"gratia-{item.id}")
+
+
 def push_to_owner_phone(title: str, body: str, link: str | None = None) -> None:
     """Optional phone alert through ntfy (the same NTFY_TOPIC used for sign-in
     codes). Runs as a background task; failures are only logged."""

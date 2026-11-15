@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, HttpUrl
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, HttpUrl, model_validator
 
 
 class LoginRequest(BaseModel):
@@ -26,6 +26,17 @@ class AuthResponse(BaseModel):
     message: str
     user: UserResponse
     is_video_admin: bool = False
+    # Admin panel role: "owner", "admin", "agent", or None for no panel access.
+    role: Optional[str] = None
+
+    @model_validator(mode="after")
+    def fill_role(self):
+        if self.role is None:
+            if self.is_video_admin:
+                self.role = "owner"
+            elif self.user.is_active and self.user.role in ("admin", "agent"):
+                self.role = self.user.role
+        return self
 
 
 class VideoWrite(BaseModel):

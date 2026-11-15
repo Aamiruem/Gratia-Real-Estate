@@ -13,7 +13,7 @@ import json
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, Response, status
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import StreamingResponse
 from jose import JWTError
@@ -26,8 +26,7 @@ from ..database import SessionLocal, get_db
 from ..dependencies import ACCESS_COOKIE
 from ..models import Notification, User
 from ..security import decode_token
-from .auth import is_video_admin
-from .videos import require_video_admin
+from ..permissions import require_any_staff, require_manager, staff_role
 
 router = APIRouter(prefix="/notifications", tags=["Notifications"])
 
@@ -59,7 +58,10 @@ class ReadChange(BaseModel):
 
 
 class Announcement(BaseModel):
-    kind: str = Field(default="property.added", pattern=r"^(property\.added|announcement)$")
+    kind: str = Field(
+        default="announcement",
+        pattern=r"^(property\.added|property\.price|property\.availability|property\.offer|announcement)$",
+    )
     title: str = Field(min_length=3, max_length=150)
     body: str = Field(default="", max_length=500)
     link: Optional[str] = Field(default=None, max_length=300)
@@ -92,10 +94,16 @@ def public_notifications(response: Response, db: Session = Depends(get_db)):
 
 @router.get("", response_model=NotificationList)
 def owner_notifications(
+    background: BackgroundTasks,
     limit: int = 50,
     db: Session = Depends(get_db),
-    _owner: User = Depends(require_video_admin),
+    _owner: User = Depends(require_any_staff),
 ):
+    from .leads import create_due_follow_up_notifications
+
+    due = create_due_follow_up_notifications(db)
+    if due:
+        notifications.dispatch(background, due)
     limit = max(1, min(limit, 200))
     items = db.scalars(
         select(Notification)
@@ -110,7 +118,7 @@ def owner_notifications(
 
 
 @router.post("/read-all", status_code=status.HTTP_204_NO_CONTENT)
-def mark_all_read(db: Session = Depends(get_db), _owner: User = Depends(require_video_admin)):
+def mark_all_read(db: Session = Depends(get_db), _owner: User = Depends(require_any_staff)):
     db.execute(
         update(Notification)
         .where(Notification.audience == "owner", Notification.is_read.is_(False))
@@ -133,7 +141,7 @@ def set_read(
     notification_id: int,
     change: ReadChange,
     db: Session = Depends(get_db),
-    _owner: User = Depends(require_video_admin),
+    _owner: User = Depends(require_any_staff),
 ):
     item = _owned(notification_id, db)
     item.is_read = change.is_read
@@ -147,7 +155,7 @@ def set_read(
 def delete_notification(
     notification_id: int,
     db: Session = Depends(get_db),
-    _owner: User = Depends(require_video_admin),
+    _owner: User = Depends(require_any_staff),
 ):
     db.execute(delete(Notification).where(Notification.id == _owned(notification_id, db).id))
     db.commit()
@@ -158,15 +166,16 @@ def delete_notification(
 @router.post("/announce", response_model=NotificationResponse, status_code=status.HTTP_201_CREATED)
 def announce(
     payload: Announcement,
+    background: BackgroundTasks,
     db: Session = Depends(get_db),
-    _owner: User = Depends(require_video_admin),
+    _owner: User = Depends(require_manager),
 ):
     item = notifications.create(
         db, audience="public", kind=payload.kind, title=payload.title.strip(), body=payload.body.strip(), link=payload.link
     )
     db.commit()
     db.refresh(item)
-    notifications.bump()
+    notifications.dispatch(background, [item])
     return item
 
 
@@ -180,7 +189,7 @@ def _owner_from_cookie(request: Request) -> bool:
         return False
     with SessionLocal() as db:
         user = db.get(User, user_id)
-        return bool(user and user.is_active and is_video_admin(user))
+        return bool(user and user.is_active and staff_role(user))
 
 
 def _latest_for(audiences: tuple[str, ...]) -> int:
