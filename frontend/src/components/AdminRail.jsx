@@ -46,8 +46,9 @@ export default function AdminRail() {
       aria-label="Admin shortcuts"
       className="group/rail fixed inset-y-0 left-0 z-[45] hidden w-[60px] flex-col overflow-hidden bg-[#0f1f2e] pt-[92px] text-white shadow-[8px_0_30px_rgba(13,27,42,.18)] transition-[width] duration-200 focus-within:w-60 hover:w-60 lg:flex"
     >
-      <p className="mb-2 whitespace-nowrap px-[18px] text-[10px] font-bold uppercase tracking-[.18em] text-[#e1c98f]">
-        <span className="group-hover/rail:hidden group-focus-within/rail:hidden">Admin</span>
+      {/* Label only when expanded; collapsed, a short gold rule marks the section. */}
+      <p className="mb-2 flex h-4 items-center whitespace-nowrap px-[18px] text-[10px] font-bold uppercase tracking-[.18em] text-[#e1c98f]">
+        <span className="h-0.5 w-6 rounded-full bg-[#c9a45c] group-hover/rail:hidden group-focus-within/rail:hidden" aria-hidden="true" />
         <span className="hidden group-hover/rail:inline group-focus-within/rail:inline">Admin · {role}</span>
       </p>
       <ul className="flex-1 space-y-1 overflow-y-auto overflow-x-hidden px-2 pb-4">
