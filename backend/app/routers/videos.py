@@ -3,6 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .. import config  # noqa: F401
+from .. import notifications
 from ..database import get_db
 from ..dependencies import get_current_user
 from ..models import User, Video
@@ -33,6 +34,15 @@ def upsert_video(payload: VideoWrite, db: Session) -> Video:
     if video is None:
         video = Video(id=payload.id)
         db.add(video)
+        # A genuinely new video is a real event every visitor can see.
+        notifications.create(
+            db,
+            audience="public",
+            kind="video.added",
+            title=f"New video: {payload.title.strip()}",
+            body="A new property video was added to the Gratia Estates library.",
+            link=f"/projects/{payload.project_slug}" if payload.project_slug else "/videos",
+        )
 
     video.title = payload.title.strip()
     video.url = str(payload.url)
@@ -59,6 +69,7 @@ def upsert_videos(
         )
     videos = [upsert_video(payload, db) for payload in payloads]
     db.commit()
+    notifications.bump()
     for video in videos:
         db.refresh(video)
     return videos
@@ -78,6 +89,7 @@ def save_video(
         )
     video = upsert_video(payload, db)
     db.commit()
+    notifications.bump()
     db.refresh(video)
     return video
 

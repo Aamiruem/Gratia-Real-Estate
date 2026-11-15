@@ -42,7 +42,9 @@ def get_db():
 def create_tables():
     from .models import (  # noqa: F401
         EmailChangeChallenge,
+        Lead,
         LoginChallenge,
+        Notification,
         OwnerRecoveryChallenge,
         OwnerSetupState,
         User,

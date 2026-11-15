@@ -30,6 +30,8 @@ from . import config  # noqa: F401
 from . import otp
 from .database import create_tables, engine
 from .routers.auth import router as auth_router
+from .routers.leads import router as leads_router
+from .routers.notifications import router as notifications_router
 from .routers.reactions import router as reactions_router
 from .routers.users import router as users_router
 from .routers.videos import router as videos_router
@@ -46,7 +48,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Gratia Estates API",
     version="1.1.0",
-    description="Owner OTP sign-in, project videos and reactions for gratiaestates.com",
+    description="Owner OTP sign-in, project videos, reactions, leads and notifications for gratiaestates.com",
     lifespan=lifespan,
 )
 
@@ -108,6 +110,8 @@ app.include_router(auth_router)
 app.include_router(users_router)
 app.include_router(videos_router)
 app.include_router(reactions_router)
+app.include_router(leads_router)
+app.include_router(notifications_router)
 
 
 if __name__ == "__main__":
