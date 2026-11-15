@@ -1,5 +1,6 @@
 import { apiRequest, backendUrl } from "./apiClient";
 import { addLocalNotification } from "../hooks/useNotifications";
+import { getTrafficSource, track } from "../analytics/analytics";
 
 const KIND_LABELS = {
   contact: "enquiry",
@@ -12,7 +13,8 @@ const KIND_LABELS = {
 
 // Turns form values into the API body; empty strings are left out.
 function body(kind, fields) {
-  const payload = { kind, source_page: window.location.pathname };
+  // Source = how the visitor arrived (organic, social, direct...): no personal data.
+  const payload = { kind, source_page: window.location.pathname, source: getTrafficSource().source };
   for (const [key, value] of Object.entries(fields)) {
     if (value === undefined || value === null) continue;
     const text = typeof value === "string" ? value.trim() : value;
@@ -32,6 +34,7 @@ export async function submitLead(kind, fields) {
     body: JSON.stringify(body(kind, fields)),
   });
   if (result?.reference) {
+    track("lead_submit", { detail: kind, property_slug: fields.property_slug });
     const label = KIND_LABELS[kind] ?? "enquiry";
     addLocalNotification({
       id: `lead-${result.reference}`,

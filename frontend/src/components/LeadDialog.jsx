@@ -4,6 +4,7 @@ import { CalendarCheck, CheckCircle2, Loader2, MessageCircle, PhoneCall, ShieldC
 import { projects } from "../data/projects";
 import { submitLead } from "../services/leadsApi";
 import { formatWhatsAppMessage, openWhatsApp } from "../utils/whatsapp";
+import { track } from "../analytics/analytics";
 import { BUDGET_OPTIONS, TIME_OPTIONS, todayIso, validateLead } from "../utils/leadValidation";
 
 /*
@@ -15,6 +16,7 @@ import { BUDGET_OPTIONS, TIME_OPTIONS, todayIso, validateLead } from "../utils/l
 const EVENT = "gratia-open-lead-dialog";
 
 export function openLeadDialog(options = {}) {
+  track("enquiry_click", { detail: options.kind || "callback", property_slug: options.project?.slug });
   window.dispatchEvent(new CustomEvent(EVENT, { detail: options }));
 }
 

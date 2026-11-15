@@ -2,6 +2,7 @@ import { Component, lazy, Suspense } from "react";
 import { Navigate, Routes, Route, useLocation } from "react-router-dom";
 import Layout from "./components/Layout";
 import Home from "./pages/Home";
+import { usePropertiesVersion } from "./data/liveProperties";
 
 // The home page loads with the main bundle; every other page is downloaded
 // only when visited, which keeps the first load small and fast.
@@ -17,7 +18,11 @@ const BlogDetails = lazy(() => import("./pages/BlogDetails"));
 const Privacy = lazy(() => import("./pages/Privacy"));
 const Terms = lazy(() => import("./pages/Terms"));
 const Notifications = lazy(() => import("./pages/Notifications"));
-const LeadsAdmin = lazy(() => import("./pages/LeadsAdmin"));
+const AdminApp = lazy(() => import("./admin/AdminApp"));
+const Residential = lazy(() => import("./pages/Residential"));
+const Commercial = lazy(() => import("./pages/Commercial"));
+const Services = lazy(() => import("./pages/Services"));
+const CookiePolicy = lazy(() => import("./pages/CookiePolicy"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 function PageLoading() {
@@ -62,6 +67,8 @@ class PageErrorBoundary extends Component {
 
 export default function App() {
   const { pathname } = useLocation();
+  // Re-render pages when live listings arrive from the backend.
+  usePropertiesVersion();
   return (
     <Layout>
       {/* Keyed by page so a failed page doesn't stay stuck after navigating. */}
@@ -85,7 +92,12 @@ export default function App() {
             <Route path="/privacy-policy" element={<Privacy />} />
             <Route path="/terms-conditions" element={<Terms />} />
             <Route path="/notifications" element={<Notifications />} />
-            <Route path="/admin/leads" element={<LeadsAdmin />} />
+            <Route path="/properties" element={<Navigate to="/projects" replace />} />
+            <Route path="/residential" element={<Residential />} />
+            <Route path="/commercial" element={<Commercial />} />
+            <Route path="/services" element={<Services />} />
+            <Route path="/cookie-policy" element={<CookiePolicy />} />
+            <Route path="/admin/*" element={<AdminApp />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </Suspense>

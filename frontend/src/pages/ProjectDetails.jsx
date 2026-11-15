@@ -32,6 +32,7 @@ import { saveLeadInBackground } from "../services/leadsApi";
 import { isValidPhone } from "../utils/leadValidation";
 import { toast } from "../components/Toaster";
 import ShareButton from "../components/ShareButton";
+import { track } from "../analytics/analytics";
 import { openLeadDialog } from "../components/LeadDialog";
 import { recordProjectView, similarProjects } from "../utils/recommender";
 import { SITE_URL } from "../config/site";
@@ -73,7 +74,10 @@ export default function ProjectDetails() {
   const suggestedProjects = project ? similarProjects(project.slug, 3) : [];
 
   useEffect(() => {
-    if (project) recordProjectView(project.slug);
+    if (project) {
+      recordProjectView(project.slug);
+      track("property_view", { property_slug: project.slug });
+    }
   }, [project]);
   const amenityFeatures = project
     ? [...new Set([...project.highlights, ...sharedFeatures])].slice(0, 8)

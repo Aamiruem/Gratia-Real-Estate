@@ -11,9 +11,17 @@ let inflight = null;
 async function check() {
   try {
     const session = await authApi.restoreSession();
-    cached = { checked: true, isOwner: session?.is_video_admin === true, user: session?.user ?? null };
+    const role = session?.role ?? (session?.is_video_admin ? "owner" : null);
+    cached = {
+      checked: true,
+      isOwner: session?.is_video_admin === true,
+      // Owner, admin or agent: may open the admin panel.
+      isStaff: Boolean(role),
+      role,
+      user: session?.user ?? null,
+    };
   } catch {
-    cached = { checked: true, isOwner: false, user: null };
+    cached = { checked: true, isOwner: false, isStaff: false, role: null, user: null };
   }
   return cached;
 }
@@ -25,7 +33,7 @@ export function notifyAuthChanged() {
 }
 
 export default function useOwner() {
-  const [state, setState] = useState(cached ?? { checked: false, isOwner: false, user: null });
+  const [state, setState] = useState(cached ?? { checked: false, isOwner: false, isStaff: false, role: null, user: null });
 
   useEffect(() => {
     let active = true;

@@ -42,11 +42,13 @@ export default function VideoAdminAuth() {
   }, [otpOptionsRefresh]);
 
   const finish = async (result) => {
-    if (!result.is_video_admin) {
+    if (!result.is_video_admin && !result.role) {
       await authApi.logout();
-      throw new Error("This account is not configured as the video library owner.");
+      throw new Error("This account does not have access to the admin panel.");
     }
-    navigate("/videos", { replace: true });
+    // Back to the page that asked for sign-in (e.g. /admin/leads), else the admin panel.
+    const next = new URLSearchParams(window.location.search).get("next");
+    navigate(next && next.startsWith("/") && !next.startsWith("//") ? next : "/admin", { replace: true });
   };
 
   const toChallenge = (result, fallback = {}) => ({

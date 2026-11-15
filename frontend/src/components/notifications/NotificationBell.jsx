@@ -44,7 +44,7 @@ export function AlertsToggle({ notifications }) {
 }
 
 export default function NotificationBell() {
-  const { isOwner } = useOwner();
+  const { isStaff: isOwner } = useOwner();
   const notifications = useNotifications();
   const [open, setOpen] = useState(false);
   const wrapperRef = useRef(null);
@@ -123,11 +123,11 @@ export default function NotificationBell() {
             <div className="flex items-center gap-3">
               {isOwner && (
                 <Link
-                  to="/admin/leads"
+                  to="/admin"
                   onClick={() => setOpen(false)}
                   className="inline-flex items-center gap-1.5 text-xs font-bold text-[#142536] hover:text-[#80602b]"
                 >
-                  <LayoutDashboard size={14} aria-hidden="true" /> Leads
+                  <LayoutDashboard size={14} aria-hidden="true" /> Admin
                 </Link>
               )}
               <Link to="/notifications" onClick={() => setOpen(false)} className="text-xs font-bold text-[#142536] hover:text-[#80602b]">

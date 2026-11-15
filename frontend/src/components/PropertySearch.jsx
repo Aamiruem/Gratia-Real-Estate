@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { track } from "../analytics/analytics";
 import { Banknote, Building2, MapPin, Search } from "lucide-react";
-import { BUDGET_RANGES, LOCATIONS, PROPERTY_TYPES } from "../utils/propertySearch";
+import { BedDouble } from "lucide-react";
+import { BUDGET_RANGES, CONFIGURATIONS, getLocations, PROPERTY_TYPES } from "../utils/propertySearch";
 
 /** Location + budget + property type search that opens the filtered Projects page. */
 export default function PropertySearch({ initial = {}, className = "", compact = false }) {
@@ -10,19 +12,22 @@ export default function PropertySearch({ initial = {}, className = "", compact =
     location: initial.location || "",
     budget: initial.budget || "",
     type: initial.type || "",
+    config: initial.config || "",
   });
 
   const submit = (event) => {
     event.preventDefault();
     const params = new URLSearchParams(Object.entries(values).filter(([, value]) => value));
+    track("search", { detail: [values.location, values.budget, values.type, values.config].filter(Boolean).join(" | ") || "all" });
     if (initial.stage) params.set("stage", initial.stage);
     navigate(`/projects${params.toString() ? `?${params}` : ""}#results`);
   };
 
   const fields = [
-    { id: "location", label: "Location", Icon: MapPin, placeholder: "Any location", options: LOCATIONS.map((l) => ({ id: l, label: l })) },
+    { id: "location", label: "Location", Icon: MapPin, placeholder: "Any location", options: getLocations().map((l) => ({ id: l, label: l })) },
     { id: "budget", label: "Budget", Icon: Banknote, placeholder: "Any budget", options: BUDGET_RANGES },
     { id: "type", label: "Property type", Icon: Building2, placeholder: "Any type", options: PROPERTY_TYPES },
+    { id: "config", label: "Configuration", Icon: BedDouble, placeholder: "Any BHK", options: CONFIGURATIONS },
   ];
 
   return (
@@ -30,7 +35,7 @@ export default function PropertySearch({ initial = {}, className = "", compact =
       onSubmit={submit}
       role="search"
       aria-label="Search properties by location, budget and type"
-      className={`grid gap-2 rounded-3xl border border-[#e7e2d8] bg-white p-2 shadow-[0_18px_50px_rgba(20,37,54,.10)] sm:grid-cols-[1fr_1fr_1fr_auto] ${className}`}
+      className={`grid gap-2 rounded-3xl border border-[#e7e2d8] bg-white p-2 shadow-[0_18px_50px_rgba(20,37,54,.10)] sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_1fr_auto] ${className}`}
     >
       {fields.map(({ id, label, Icon, placeholder, options }) => (
         <label
@@ -59,7 +64,7 @@ export default function PropertySearch({ initial = {}, className = "", compact =
       ))}
       <button
         type="submit"
-        className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-[#142536] px-6 text-sm font-bold text-white transition hover:bg-[#c9a45c] hover:text-[#142536]"
+        className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-[#142536] px-6 sm:col-span-2 lg:col-span-1 text-sm font-bold text-white transition hover:bg-[#c9a45c] hover:text-[#142536]"
       >
         <Search size={17} aria-hidden="true" /> Search
       </button>

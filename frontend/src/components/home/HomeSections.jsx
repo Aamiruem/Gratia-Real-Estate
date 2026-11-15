@@ -33,7 +33,7 @@ import { posts } from "../../data/blog";
 import { SITE_URL as SITE } from "../../config/site";
 import { projects } from "../../data/projects";
 
-const developers = [...new Set(projects.map((p) => p.developer).filter(Boolean))];
+const getDevelopers = () => [...new Set(projects.map((p) => p.developer).filter(Boolean))];
 
 const stages = [
   {
@@ -90,7 +90,7 @@ function SectionHeading({ eyebrow, title, text, light = false }) {
 export function StatsBand() {
   const stats = [
     { icon: Building2, value: `${projects.length}+`, label: "Curated projects" },
-    { icon: Landmark, value: `${developers.length}`, label: "Leading developers" },
+    { icon: Landmark, value: `${getDevelopers().length}`, label: "Leading developers" },
     { icon: Layers, value: `${stages.filter((s) => s.count).length}`, label: "Project stages covered" },
     { icon: Users, value: "1:1", label: "Personal advisory" },
   ];
@@ -128,7 +128,7 @@ export function StatsBand() {
             Projects from
           </p>
           <ul className="flex flex-wrap gap-2.5">
-            {developers.map((name) => (
+            {getDevelopers().map((name) => (
               <li
                 key={name}
                 className="rounded-full border border-white/15 bg-white/[.06] px-4 py-2 text-sm font-semibold text-white/90"

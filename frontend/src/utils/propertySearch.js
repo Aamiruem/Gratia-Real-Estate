@@ -19,28 +19,56 @@ export const BUDGET_RANGES = [
 ];
 
 export const PROPERTY_TYPES = [
-  { id: "residential", label: "Residential" },
+  { id: "residential", label: "All residential" },
+  { id: "apartment", label: "Apartments / flats" },
   { id: "luxury", label: "Luxury homes" },
-  { id: "premium", label: "Premium homes" },
+  { id: "villa", label: "Villas / floors" },
+  { id: "plot", label: "Plots" },
   { id: "commercial", label: "Commercial" },
+];
+
+export const CONFIGURATIONS = [
+  { id: "1", label: "1 BHK" },
+  { id: "2", label: "2 BHK" },
+  { id: "3", label: "3 BHK" },
+  { id: "4", label: "4 BHK" },
+  { id: "5", label: "5+ BHK / Penthouse" },
 ];
 
 // "Sector 32, Sohna, Gurgaon" -> "Sector 32, Sohna"
 export const shortLocation = (location) => String(location || "").replace(/,?\s*Gurgaon$/i, "");
 
-export const LOCATIONS = [...new Set(projects.map((p) => shortLocation(p.location)).filter(Boolean))].sort(
+export const getLocations = () => [...new Set(projects.map((p) => shortLocation(p.location)).filter(Boolean))].sort(
   (a, b) => (parseInt(a.replace(/\D/g, ""), 10) || 0) - (parseInt(b.replace(/\D/g, ""), 10) || 0),
 );
 
+export const isCommercial = (project) =>
+  project.category === "commercial" || /commercial|office|retail|shop/.test(String(project.type).toLowerCase());
+
 export function matchesType(project, type) {
   if (!type) return true;
-  const text = `${project.type} ${project.description || ""}`.toLowerCase();
-  if (type === "commercial") return /commercial|office|retail|shop/.test(String(project.type).toLowerCase());
-  if (type === "residential") return String(project.type).toLowerCase().includes("residential");
+  const kind = String(project.type).toLowerCase();
+  const text = `${kind} ${project.configuration || ""} ${project.description || ""}`.toLowerCase();
+  if (type === "commercial") return isCommercial(project);
+  if (isCommercial(project)) return false;
+  if (type === "residential") return true;
+  if (type === "villa") return /villa|independent|builder floor/.test(text);
+  if (type === "plot") return /\bplots?\b/.test(text);
+  if (type === "apartment") return !/villa|\bplots?\b/.test(kind);
   return text.includes(type);
 }
 
-export function filterProjects(list, { location = "", budget = "", type = "", q = "" } = {}) {
+// "3, 4 BHK" matches 3 and 4. Listings without a configuration stay visible:
+// the advisor confirms the unit mix.
+export function matchesConfiguration(project, config) {
+  if (!config) return true;
+  const text = String(project.configuration || "");
+  if (!text.trim()) return true;
+  const sizes = (text.match(/\d+(?:\.\d+)?/g) || []).map(Number);
+  return config === "5" ? sizes.some((n) => n >= 5) || /penthouse/i.test(text) : sizes.includes(Number(config));
+}
+
+export function filterProjects(list, { location = "", budget = "", type = "", config = "", q = "" } = {}) {
   const range = BUDGET_RANGES.find((r) => r.id === budget);
   const terms = q.trim().toLowerCase().split(/\s+/).filter(Boolean);
   return list.filter((project) => {
@@ -51,6 +79,7 @@ export function filterProjects(list, { location = "", budget = "", type = "", q 
       if (price !== null && (price < range.min || price >= range.max)) return false;
     }
     if (!matchesType(project, type)) return false;
+    if (!matchesConfiguration(project, config)) return false;
     if (terms.length) {
       const haystack = [project.name, project.developer, project.location, project.type, project.status, ...(project.highlights || [])]
         .join(" ")

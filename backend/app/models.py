@@ -150,6 +150,8 @@ class Lead(Base):
     source: Mapped[str | None] = mapped_column(String(60), index=True, nullable=True)  # organic, direct, social...
     assigned_to_id: Mapped[int | None] = mapped_column(Integer, index=True, nullable=True)
     follow_up_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True, nullable=True)
+    # SHA-256 of the submitting device's key: lets us send the customer updates in their bell.
+    device_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, index=True, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_now, onupdate=_now, nullable=False
@@ -171,6 +173,8 @@ class Notification(Base):
     body: Mapped[str] = mapped_column(String(500), default="", nullable=False)
     link: Mapped[str | None] = mapped_column(String(300), nullable=True)
     lead_reference: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    # audience="visitor": private to one device (SHA-256 of its random device key).
+    recipient: Mapped[str | None] = mapped_column(String(64), index=True, nullable=True)
     is_read: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, index=True, nullable=False)
 

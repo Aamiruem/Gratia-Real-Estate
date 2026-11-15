@@ -42,8 +42,9 @@ def create(
     body: str = "",
     link: str | None = None,
     lead_reference: str | None = None,
+    recipient: str | None = None,
 ) -> Notification:
-    """Adds a notification to the session; the caller commits, then calls bump()."""
+    """Adds a notification to the session; the caller commits, then calls dispatch()."""
     item = Notification(
         audience=audience,
         kind=kind,
@@ -51,6 +52,7 @@ def create(
         body=body[:500],
         link=link,
         lead_reference=lead_reference,
+        recipient=recipient,
     )
     db.add(item)
     return item
@@ -64,8 +66,20 @@ def dispatch(background, items: list[Notification]) -> None:
     if background is None or not push.configured():
         return
     for item in items:
+        if item.audience == "visitor":
+            continue  # shown in that visitor's bell; no broadcast push
         audience = "public" if item.audience == "public" else "staff"
         background.add_task(push.send, audience, item.title, item.body, item.link, f"gratia-{item.id}")
+
+
+def device_hash(token: str | None) -> str | None:
+    """Device keys are random 32+ character secrets created in the browser."""
+    import hashlib
+    import re
+
+    if not token or not re.fullmatch(r"[A-Za-z0-9_-]{32,80}", token):
+        return None
+    return hashlib.sha256(token.encode()).hexdigest()
 
 
 def push_to_owner_phone(title: str, body: str, link: str | None = None) -> None:

@@ -42,6 +42,7 @@ import {
   WhyChooseUs,
 } from "../components/home/HomeExtras";
 import { projects as projectData } from "../data/projects";
+import { featuredProjects } from "../data/liveProperties";
 import { formatWhatsAppMessage, openWhatsApp } from "../utils/whatsapp";
 import { saveLeadInBackground } from "../services/leadsApi";
 import { isValidPhone } from "../utils/leadValidation";
@@ -51,9 +52,9 @@ const PHONE_NUMBER = "+919109776155";
 const MAX_FEATURED = 8;
 
 const projects = Array.isArray(projectData) ? projectData : [];
-const heroSlides = projects.slice(0, MAX_FEATURED);
+const getHeroSlides = () => featuredProjects(MAX_FEATURED);
 // e.g. "SOBHA Limited, DLF India, Godrej Properties and more"
-const heroDevelopers = `${[...new Set(projects.map((p) => p.developer).filter(Boolean))]
+const getHeroDevelopers = () => `${[...new Set(projects.map((p) => p.developer).filter(Boolean))]
   .slice(0, 4)
   .join(", ")} and more`;
 
@@ -271,6 +272,7 @@ function HomeContactPopup() {
 }
 
 function FeaturedProjectSlider() {
+  const heroSlides = getHeroSlides();
   const [activeIndex, setActiveIndex] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
 
@@ -282,7 +284,7 @@ function FeaturedProjectSlider() {
     }, 5000);
 
     return () => window.clearInterval(timer);
-  }, [isPaused]);
+  }, [isPaused, heroSlides.length]);
 
   if (heroSlides.length === 0) {
     return (
@@ -392,7 +394,7 @@ function FeaturedProjectSlider() {
 export default function Home() {
   const [projectQuery, setProjectQuery] = useState("");
   const navigate = useNavigate();
-  const featured = projects.slice(0, MAX_FEATURED);
+  const featured = featuredProjects(MAX_FEATURED);
 
   const searchResults = useMemo(() => {
     const terms = projectQuery
@@ -456,7 +458,7 @@ export default function Home() {
               Compare new-launch, under-construction and ready-to-move homes
               from{" "}
               <strong className="font-semibold text-[#142536]">
-                {heroDevelopers}
+                {getHeroDevelopers()}
               </strong>{" "}
               with one advisor guiding you from shortlist to site visit.
             </p>

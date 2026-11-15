@@ -13,12 +13,15 @@ const socials = footerSocialLinks.filter((link) => link.href);
 const quickLinks = [
   { label: "Home", to: "/" },
   { label: "About Us", to: "/about" },
+  { label: "Residential", to: "/residential" },
+  { label: "Commercial", to: "/commercial" },
+  { label: "Our Services", to: "/services" },
   { label: "Property Videos", to: "/videos" },
   { label: "Property Insights", to: "/blog" },
   { label: "Contact Us", to: "/contact" },
 ];
 
-const stages = ["Ready to Move", "Launched", "Under Development", "Pre-Launch / New Launch"].map(
+const getStages = () => ["Ready to Move", "Launched", "Under Development", "Pre-Launch / New Launch"].map(
   (status) => ({ status, count: projects.filter((p) => p.status === status).length }),
 );
 
@@ -109,7 +112,7 @@ export default function Footer() {
           <div>
             <ColumnTitle>Projects</ColumnTitle>
             <ul className="mt-4 space-y-2.5">
-              {stages.map(({ status, count }) => (
+              {getStages().map(({ status, count }) => (
                 <li key={status}>
                   <Link to={`/projects?stage=${encodeURIComponent(status)}`} className={linkClass}>
                     {status}

@@ -3,6 +3,10 @@ import { Link, NavLink, useLocation } from "react-router-dom";
 import {
   Bell,
   BookOpen,
+  Briefcase,
+  Ellipsis,
+  Handshake,
+  KeyRound,
   Building2,
   CalendarCheck,
   ChevronDown,
@@ -27,14 +31,20 @@ import InstallAppButton from "./InstallAppButton";
 // Each item has its own icon colour so the menu is easy to scan.
 const nav = [
   { label: "Home", to: "/", icon: House, tone: "bg-amber-100 text-amber-700" },
-  { label: "About Us", to: "/about", icon: UsersRound, tone: "bg-sky-100 text-sky-700" },
-  { label: "Projects", to: "/projects", icon: Building2, tone: "bg-emerald-100 text-emerald-700" },
+  { label: "About", to: "/about", icon: UsersRound, tone: "bg-sky-100 text-sky-700" },
+  { label: "Properties", to: "/projects", icon: Building2, tone: "bg-emerald-100 text-emerald-700" },
+  { label: "Residential", to: "/residential", icon: KeyRound, tone: "bg-teal-100 text-teal-700" },
+  { label: "Commercial", to: "/commercial", icon: Briefcase, tone: "bg-indigo-100 text-indigo-700" },
+  { label: "Services", to: "/services", icon: Handshake, tone: "bg-fuchsia-100 text-fuchsia-700" },
+  { label: "Contact", to: "/contact", icon: Phone, tone: "bg-orange-100 text-orange-700" },
+];
+// Moved out of the main bar into "More" (and the mobile menu / footer).
+const moreNav = [
   { label: "Videos", to: "/videos", icon: Clapperboard, tone: "bg-rose-100 text-rose-700" },
   { label: "Blog", to: "/blog", icon: BookOpen, tone: "bg-violet-100 text-violet-700" },
-  { label: "Contact Us", to: "/contact", icon: Phone, tone: "bg-orange-100 text-orange-700" },
 ];
 
-const STAGES = ["Ready to Move", "Launched", "Under Development", "Pre-Launch / New Launch"].map(
+const getStages = () => ["Ready to Move", "Launched", "Under Development", "Pre-Launch / New Launch"].map(
   (status) => ({ status, count: projects.filter((p) => p.status === status).length }),
 );
 const stageLink = (status) => `/projects?stage=${encodeURIComponent(status)}`;
@@ -86,13 +96,13 @@ export default function Header() {
                   to={to}
                   end={to === "/"}
                   className={({ isActive }) =>
-                    `group inline-flex items-center gap-2 whitespace-nowrap rounded-full py-1.5 pl-1.5 pr-4 text-[13px] font-semibold transition ${isActive ? "bg-[#142536] text-white shadow-md" : "text-[#263746] hover:bg-white hover:shadow-sm"}`
+                    `group inline-flex items-center gap-2 whitespace-nowrap rounded-full px-3 py-2 text-[13px] font-semibold transition min-[1700px]:py-1.5 min-[1700px]:pl-1.5 min-[1700px]:pr-4 ${isActive ? "bg-[#142536] text-white shadow-md" : "text-[#263746] hover:bg-white hover:shadow-sm"}`
                   }
                 >
                   {({ isActive }) => (
                     <>
                       <span
-                        className={`grid size-7 place-items-center rounded-full transition ${isActive ? "bg-[#c9a45c] text-[#142536]" : tone}`}
+                        className={`hidden size-7 place-items-center rounded-full transition min-[1700px]:grid ${isActive ? "bg-[#c9a45c] text-[#142536]" : tone}`}
                       >
                         <Icon size={15} aria-hidden="true" />
                       </span>
@@ -117,6 +127,7 @@ export default function Header() {
                 <div key={to}>{link}</div>
               );
             })}
+            <MoreMenu />
           </nav>
 
           <div className="flex items-center gap-1.5 sm:gap-2">
@@ -171,7 +182,7 @@ export default function Header() {
       >
         <nav className="container-luxury py-4" aria-label="Mobile navigation">
           <ul className="grid gap-2 sm:grid-cols-2">
-            {nav.map(({ label, to, icon: Icon, tone }) => (
+            {[...nav, ...moreNav].map(({ label, to, icon: Icon, tone }) => (
               <li key={to}>
                 <NavLink
                   to={to}
@@ -199,7 +210,7 @@ export default function Header() {
             Browse projects by stage
           </p>
           <div className="mt-2 flex flex-wrap gap-2">
-            {STAGES.map(({ status, count }) => (
+            {getStages().map(({ status, count }) => (
               <Link
                 key={status}
                 to={stageLink(status)}
@@ -267,7 +278,7 @@ function ProjectsMenu() {
             Browse by stage
           </p>
           <ul className="mt-3 space-y-1">
-            {STAGES.map(({ status, count }) => (
+            {getStages().map(({ status, count }) => (
               <li key={status}>
                 <Link
                   to={stageLink(status)}
@@ -318,6 +329,41 @@ function ProjectsMenu() {
             ))}
           </ul>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// Desktop "More" dropdown: secondary pages moved out of the main bar.
+function MoreMenu() {
+  return (
+    <div className="group/more relative">
+      <button
+        type="button"
+        aria-haspopup="true"
+        className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-2 text-[13px] font-semibold text-[#263746] transition hover:bg-white hover:shadow-sm"
+      >
+        <Ellipsis size={16} aria-hidden="true" /> More
+        <ChevronDown size={14} className="transition group-hover/more:rotate-180" aria-hidden="true" />
+      </button>
+      <div className="invisible absolute right-0 top-full z-50 w-56 pt-3 opacity-0 transition duration-200 group-focus-within/more:visible group-focus-within/more:opacity-100 group-hover/more:visible group-hover/more:opacity-100">
+        <ul className="rounded-2xl border border-[#e7e2d8] bg-white p-2 shadow-[0_24px_60px_rgba(13,27,42,.18)]">
+          {moreNav.map(({ label, to, icon: Icon, tone }) => (
+            <li key={to}>
+              <NavLink
+                to={to}
+                className={({ isActive }) =>
+                  `flex items-center gap-3 rounded-xl px-2.5 py-2 text-sm font-semibold transition ${isActive ? "bg-[#f7f4ed] text-[#142536]" : "text-[#263746] hover:bg-[#f7f4ed]"}`
+                }
+              >
+                <span className={`grid size-8 place-items-center rounded-lg ${tone}`}>
+                  <Icon size={16} aria-hidden="true" />
+                </span>
+                {label}
+              </NavLink>
+            </li>
+          ))}
+        </ul>
       </div>
     </div>
   );

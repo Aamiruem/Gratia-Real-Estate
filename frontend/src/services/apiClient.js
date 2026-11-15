@@ -27,6 +27,8 @@ export async function apiRequest(path, options = {}) {
       headers: {
         ...(options.body ? { "Content-Type": "application/json" } : {}),
         Accept: "application/json",
+        // CSRF protection: the API refuses signed-in writes without this header.
+        "X-Requested-With": "fetch",
         ...options.headers,
       },
     });

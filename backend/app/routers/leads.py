@@ -43,6 +43,23 @@ KIND_TITLES = {
     "whatsapp": "New lead generated (WhatsApp)",
 }
 
+VISITOR_LABELS = {
+    "contact": "enquiry",
+    "visit": "site visit request",
+    "callback": "callback request",
+    "property_enquiry": "property enquiry",
+    "consultation": "consultation request",
+    "whatsapp": "enquiry",
+}
+# Status changes the customer is told about (in their notification bell).
+VISITOR_UPDATES = {
+    "confirmed": ("Your visit is confirmed", "We look forward to meeting you"),
+    "rescheduled": ("Your visit was rescheduled", "Please check the new date and time"),
+    "completed": ("Thank you for visiting", "Your advisor will follow up with next steps"),
+    "cancelled": ("Your visit was cancelled", "Contact us any time to book a new slot"),
+    "contacted": ("An advisor is working on your enquiry", "We'll be in touch with options soon"),
+}
+
 DUPLICATE_WINDOW = timedelta(minutes=30)
 _CONTROL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
 _REFERENCE_ALPHABET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ"  # no 0/O, 1/I
@@ -89,6 +106,8 @@ class LeadCreate(BaseModel):
     requirement: Optional[Requirement] = None
     contact_time: Optional[str] = Field(default=None, max_length=60)
     source: Optional[str] = Field(default=None, max_length=60)
+    # Random key kept in the visitor's browser: their confirmations are saved for that device.
+    device_token: Optional[str] = Field(default=None, max_length=80)
     # Honeypot: hidden from people, bots tend to fill it.
     website: Optional[str] = Field(default=None, max_length=200)
 
@@ -272,6 +291,7 @@ def create_lead(
         requirement=payload.requirement,
         contact_time=clean(payload.contact_time, 60),
         source=payload.source if payload.source in SOURCES else ("direct" if payload.source else None),
+        device_hash=notifications.device_hash(payload.device_token),
     )
     db.add(lead)
     db.flush()
@@ -284,6 +304,17 @@ def create_lead(
     item = notifications.create(
         db, audience="owner", kind=f"lead.{payload.kind}", title=title, body=body, link=link, lead_reference=lead.reference
     )
+    if lead.device_hash:
+        notifications.create(
+            db,
+            audience="visitor",
+            recipient=lead.device_hash,
+            kind=f"lead.{payload.kind}",
+            title=f"We received your {VISITOR_LABELS[payload.kind]}",
+            body=f"Reference {lead.reference}. Our advisor will contact you shortly.",
+            link="/notifications",
+            lead_reference=lead.reference,
+        )
     db.commit()
     db.refresh(lead)
     notifications.dispatch(background, [item])
@@ -449,6 +480,27 @@ def create_due_follow_up_notifications(db: Session) -> list[Notification]:
     return created
 
 
+def notify_customer(db: Session, lead: Lead, new_status: str) -> None:
+    """Tells the customer (on the device they used) about a real status change."""
+    if not lead.device_hash or new_status not in VISITOR_UPDATES:
+        return
+    title, text = VISITOR_UPDATES[new_status]
+    when = ""
+    if lead.kind in APPOINTMENT_KINDS and lead.visit_date and new_status in ("confirmed", "rescheduled"):
+        when = f" {lead.visit_date.strftime('%a %d %b %Y')}" + (f", {lead.visit_time}" if lead.visit_time else "") + "."
+    place = f" ({lead.property_name})" if lead.property_name else ""
+    notifications.create(
+        db,
+        audience="visitor",
+        recipient=lead.device_hash,
+        kind="lead.update",
+        title=title,
+        body=f"Reference {lead.reference}{place}.{when} {text}.",
+        link="/notifications",
+        lead_reference=lead.reference,
+    )
+
+
 def _get(reference: str, db: Session) -> Lead:
     lead = db.scalars(select(Lead).where(Lead.reference == reference.upper())).first()
     if lead is None:
@@ -485,6 +537,8 @@ def update_lead(
         allowed = VISIT_STATUSES if lead.kind in APPOINTMENT_KINDS else LEAD_STATUSES
         if payload.status not in allowed:
             raise HTTPException(status_code=422, detail=f"Status must be one of: {', '.join(allowed)}")
+        if payload.status != lead.status:
+            notify_customer(db, lead, payload.status)
         lead.status = payload.status
     if payload.owner_notes is not None:
         lead.owner_notes = clean(payload.owner_notes, 5000) or ""
@@ -515,6 +569,8 @@ def add_follow_up(
         allowed = VISIT_STATUSES if lead.kind in APPOINTMENT_KINDS else LEAD_STATUSES
         if payload.status not in allowed:
             raise HTTPException(status_code=422, detail=f"Status must be one of: {', '.join(allowed)}")
+        if payload.status != lead.status:
+            notify_customer(db, lead, payload.status)
         lead.status = payload.status
     entry = FollowUp(
         lead_id=lead.id,

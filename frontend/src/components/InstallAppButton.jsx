@@ -3,6 +3,7 @@ import { CheckCircle2, Download, MonitorDown, Smartphone, X } from "lucide-react
 import useInstallPrompt from "../hooks/useInstallPrompt";
 import { platform } from "../pwa/install";
 import { toast } from "./Toaster";
+import { track } from "../analytics/analytics";
 
 function instructionsFor(p) {
   if (p.ios) {
@@ -148,6 +149,7 @@ export default function InstallAppButton({ variant = "header", className = "" })
       if (outcome === "accepted") toast("Gratia Estates is being installed.");
       return;
     }
+    track("install_click", { detail: "instructions" });
     if (installed) {
       toast("Gratia Estates is already installed. Open it from your home screen or apps.", "info");
       return;

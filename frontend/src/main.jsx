@@ -4,11 +4,15 @@ import { BrowserRouter } from "react-router-dom";
 import App from "./App";
 import { initInstallCapture } from "./pwa/install";
 import { registerServiceWorker } from "./pwa/registerServiceWorker";
+import { initAnalytics } from "./analytics/analytics";
+import { loadLiveProperties } from "./data/liveProperties";
 import "./index.css";
 
 // Must run before the browser fires its one-time install prompt.
 initInstallCapture();
 registerServiceWorker();
+initAnalytics();
+loadLiveProperties();
 
 // After a new deployment, an open tab may ask for a page chunk that no longer
 // exists. Reload once to pick up the new version (never in a loop, never offline).

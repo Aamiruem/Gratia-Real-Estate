@@ -18,9 +18,10 @@ import ProjectCard from "../components/ProjectCard";
 import RecommendedProjects from "../components/RecommendedProjects";
 import SEO from "../components/SEO";
 import { projects } from "../data/projects";
+import { usePropertiesVersion } from "../data/liveProperties";
 import PropertySearch from "../components/PropertySearch";
 import { openLeadDialog } from "../components/LeadDialog";
-import { BUDGET_RANGES, PROPERTY_TYPES, filterProjects } from "../utils/propertySearch";
+import { BUDGET_RANGES, CONFIGURATIONS, PROPERTY_TYPES, filterProjects } from "../utils/propertySearch";
 
 const filters = [
   "All",
@@ -30,8 +31,7 @@ const filters = [
   "Under Development",
 ];
 
-const developerCount = new Set(projects.map((p) => p.developer)).size;
-const sectorCount = new Set(projects.map((p) => p.location)).size;
+
 
 const buyingTips = [
   {
@@ -60,20 +60,25 @@ export default function Projects() {
     location: searchParams.get("location") || "",
     budget: searchParams.get("budget") || "",
     type: searchParams.get("type") || "",
+    config: searchParams.get("config") || "",
     q: searchParams.get("q") || "",
   };
-  const searchKey = `${search.location}|${search.budget}|${search.type}|${search.q}`;
-  const searched = useMemo(() => filterProjects(projects, search), [searchKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  const searchKey = `${search.location}|${search.budget}|${search.type}|${search.config}|${search.q}`;
+  const liveVersion = usePropertiesVersion();
+  const developerCount = new Set(projects.map((p) => p.developer)).size;
+  const sectorCount = new Set(projects.map((p) => p.location)).size;
+  const searched = useMemo(() => filterProjects(projects, search), [searchKey, liveVersion]); // eslint-disable-line react-hooks/exhaustive-deps
   const activeChips = [
     search.location && { key: "location", label: search.location },
     search.budget && { key: "budget", label: BUDGET_RANGES.find((r) => r.id === search.budget)?.label ?? search.budget },
     search.type && { key: "type", label: PROPERTY_TYPES.find((t) => t.id === search.type)?.label ?? search.type },
+    search.config && { key: "config", label: CONFIGURATIONS.find((c) => c.id === search.config)?.label ?? search.config },
     search.q && { key: "q", label: `“${search.q}”` },
   ].filter(Boolean);
   const clearSearch = (key) => {
     const next = new URLSearchParams(searchParams);
     if (key) next.delete(key);
-    else ["location", "budget", "type", "q"].forEach((name) => next.delete(name));
+    else ["location", "budget", "type", "config", "q"].forEach((name) => next.delete(name));
     setSearchParams(next, { replace: true });
   };
   const [filter, setFilter] = useState(

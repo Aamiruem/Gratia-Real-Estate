@@ -1,3 +1,5 @@
+import { track } from "../analytics/analytics";
+
 // Captures the browser's install prompt as early as possible (it fires once,
 // often before React renders) and tracks whether the app is installed.
 
@@ -44,6 +46,7 @@ export function platform() {
 }
 
 export async function promptInstall() {
+  track("install_click");
   if (!deferredPrompt) return "unavailable";
   const promptEvent = deferredPrompt;
   deferredPrompt = null;
@@ -66,6 +69,7 @@ export function initInstallCapture() {
   });
   window.addEventListener("appinstalled", () => {
     deferredPrompt = null;
+    track("app_install");
     try {
       localStorage.setItem(INSTALLED_KEY, "1");
     } catch {

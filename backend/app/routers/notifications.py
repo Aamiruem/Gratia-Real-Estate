@@ -92,6 +92,64 @@ def public_notifications(response: Response, db: Session = Depends(get_db)):
     return NotificationList(items=items, unread=0, latest_id=items[0].id if items else 0)
 
 
+# ---------- a visitor's own notifications (saved in the database per device) ----------
+
+
+def _recipient(request: Request) -> str:
+    recipient = notifications.device_hash(request.headers.get("x-device-token"))
+    if recipient is None:
+        raise HTTPException(status_code=400, detail="Missing device key")
+    return recipient
+
+
+@router.get("/mine", response_model=NotificationList)
+def my_notifications(request: Request, response: Response, db: Session = Depends(get_db)):
+    recipient = _recipient(request)
+    items = db.scalars(
+        select(Notification)
+        .where(Notification.audience == "visitor", Notification.recipient == recipient)
+        .order_by(Notification.id.desc())
+        .limit(50)
+    ).all()
+    response.headers["Cache-Control"] = "no-store"
+    unread = sum(1 for item in items if not item.is_read)
+    return NotificationList(items=items, unread=unread, latest_id=items[0].id if items else 0)
+
+
+def _mine(notification_id: int, request: Request, db: Session) -> Notification:
+    item = db.get(Notification, notification_id)
+    if item is None or item.audience != "visitor" or item.recipient != _recipient(request):
+        raise HTTPException(status_code=404, detail="Notification not found")
+    return item
+
+
+@router.post("/mine/read-all", status_code=status.HTTP_204_NO_CONTENT)
+def my_read_all(request: Request, db: Session = Depends(get_db)):
+    db.execute(
+        update(Notification)
+        .where(Notification.audience == "visitor", Notification.recipient == _recipient(request))
+        .values(is_read=True)
+    )
+    db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.patch("/mine/{notification_id}", response_model=NotificationResponse)
+def my_set_read(notification_id: int, change: ReadChange, request: Request, db: Session = Depends(get_db)):
+    item = _mine(notification_id, request, db)
+    item.is_read = change.is_read
+    db.commit()
+    db.refresh(item)
+    return item
+
+
+@router.delete("/mine/{notification_id}", status_code=status.HTTP_204_NO_CONTENT)
+def my_delete(notification_id: int, request: Request, db: Session = Depends(get_db)):
+    db.delete(_mine(notification_id, request, db))
+    db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
 @router.get("", response_model=NotificationList)
 def owner_notifications(
     background: BackgroundTasks,

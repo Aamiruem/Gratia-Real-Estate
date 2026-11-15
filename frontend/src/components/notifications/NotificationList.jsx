@@ -1,4 +1,8 @@
 import {
+  AlarmClock,
+  BadgePercent,
+  CircleDot,
+  Tag,
   Bell,
   BellRing,
   Building2,
@@ -23,6 +27,10 @@ const KIND_ICONS = {
   "lead.property_enquiry": { Icon: Building2, tone: "bg-violet-100 text-violet-700" },
   "lead.whatsapp": { Icon: UserRoundPlus, tone: "bg-green-100 text-green-700" },
   "property.added": { Icon: Building2, tone: "bg-amber-100 text-amber-800" },
+  "property.price": { Icon: Tag, tone: "bg-emerald-100 text-emerald-700" },
+  "property.availability": { Icon: CircleDot, tone: "bg-sky-100 text-sky-700" },
+  "property.offer": { Icon: BadgePercent, tone: "bg-rose-100 text-rose-700" },
+  "lead.follow_up": { Icon: AlarmClock, tone: "bg-orange-100 text-orange-700" },
   "video.added": { Icon: Clapperboard, tone: "bg-rose-100 text-rose-700" },
   announcement: { Icon: Megaphone, tone: "bg-amber-100 text-amber-800" },
 };
