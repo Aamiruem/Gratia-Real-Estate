@@ -21,6 +21,7 @@ from . import config
 from .delivery import DeliveryError
 from .delivery import email as email_delivery
 from .delivery import sms as sms_delivery
+from .delivery import whatsapp as whatsapp_delivery
 from .security import JWT_SECRET_KEY
 
 logger = logging.getLogger("gratia.otp")
@@ -58,6 +59,11 @@ def owner_phone() -> str:
 
 def email_otp_available() -> bool:
     return email_delivery.configured() or push_configured() or console_fallback_enabled()
+
+
+def whatsapp_otp_available() -> bool:
+    """WhatsApp needs a real, approved Meta setup: no test-mode fallback."""
+    return bool(owner_phone()) and whatsapp_delivery.configured()
 
 
 def phone_otp_available() -> bool:
@@ -113,6 +119,15 @@ def send_sms_code(phone: str, code: str, purpose: str = "sign-in") -> str:
         sms_delivery.send(phone, code, purpose, CODE_TTL_MINUTES)
         return "sms"
     return _deliver_without_provider(mask_phone(phone), code, purpose)
+
+
+def send_whatsapp_code(phone: str, code: str) -> str:
+    """Sends the code through the WhatsApp Business Platform. Never falls back to
+    SMS or another channel on its own: the person chooses another channel."""
+    if not whatsapp_delivery.configured():
+        raise DeliveryError("WhatsApp delivery is not configured.")
+    whatsapp_delivery.send(sms_delivery.to_e164(phone), code)
+    return "whatsapp"
 
 
 def _deliver_without_provider(recipient: str, code: str, purpose: str) -> str:

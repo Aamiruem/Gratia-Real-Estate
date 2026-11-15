@@ -6,7 +6,7 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field, HttpUrl, model_vali
 
 class LoginRequest(BaseModel):
     """Passwordless owner sign-in: the owner's email or mobile number receives the OTP."""
-    otp_channel: Literal["email", "phone"] = "email"
+    otp_channel: Literal["email", "phone", "whatsapp"] = "email"
     email: Optional[EmailStr] = None
     phone: Optional[str] = Field(default=None, max_length=20)
 

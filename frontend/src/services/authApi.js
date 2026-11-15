@@ -6,9 +6,9 @@ export const authApi = {
     apiRequest("/auth/login", {
       method: "POST",
       body: JSON.stringify(
-        otpChannel === "phone"
-          ? { otp_channel: "phone", phone: identifier }
-          : { otp_channel: "email", email: identifier },
+        otpChannel === "email"
+          ? { otp_channel: "email", email: identifier }
+          : { otp_channel: otpChannel, phone: identifier }, // "phone" (SMS) or "whatsapp"
       ),
     }),
 

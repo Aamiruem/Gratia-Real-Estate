@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, KeyRound, Loader2, LockKeyhole, MailCheck, RotateCw, ShieldCheck, Smartphone } from "lucide-react";
+import { ArrowLeft, KeyRound, Loader2, LockKeyhole, MailCheck, MessageCircle, RotateCw, ShieldCheck, Smartphone } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import Logo from "../components/Logo";
 import SEO from "../components/SEO";
@@ -71,7 +71,7 @@ export default function VideoAdminAuth() {
     setError("");
     setSubmitting(true);
     try {
-      const identifier = otpChannel === "phone" ? phone.trim() : email.trim();
+      const identifier = otpChannel === "email" ? email.trim() : phone.trim();
       setChallenge(toChallenge(await authApi.login(otpChannel, identifier)));
     } catch (authError) {
       console.error("Video owner sign-in failed.", authError);
@@ -83,7 +83,8 @@ export default function VideoAdminAuth() {
 
   const channels = [
     { id: "email", label: "Email OTP", icon: MailCheck, hint: otpOptions.email_hint },
-    { id: "phone", label: "Mobile OTP", icon: Smartphone, hint: otpOptions.phone_hint },
+    { id: "phone", label: "SMS OTP", icon: Smartphone, hint: otpOptions.phone_hint },
+    { id: "whatsapp", label: "WhatsApp OTP", icon: MessageCircle, hint: otpOptions.whatsapp_hint },
   ];
 
   return (
@@ -181,7 +182,7 @@ export default function VideoAdminAuth() {
               />
             ) : (
               <form onSubmit={submit} className="mt-8 grid gap-5">
-                <fieldset className="grid gap-2 sm:grid-cols-2">
+                <fieldset className="grid gap-2 sm:grid-cols-3">
                   <legend className="mb-2 text-sm font-semibold text-[#263746]">Send code to</legend>
                   {channels.map(({ id, label, icon: Icon, hint }) => {
                     const available = otpOptions[id];
@@ -231,7 +232,7 @@ export default function VideoAdminAuth() {
                   </div>
                 )}
 
-                {otpChannel === "phone" ? (
+                {otpChannel !== "email" ? (
                   <label className="block">
                     <span className="mb-2 block text-sm font-semibold text-[#263746]">Mobile number</span>
                     <input
@@ -387,6 +388,8 @@ function CodeStep({ challenge, onVerified, onResent, onBack }) {
         ? "this computer (local test mode)"
         : challenge.deliveredVia === "sms"
           ? `an SMS to ${challenge.sentTo}`
+          : challenge.deliveredVia === "whatsapp"
+            ? `WhatsApp on ${challenge.sentTo}`
           : challenge.sentTo;
 
   return (

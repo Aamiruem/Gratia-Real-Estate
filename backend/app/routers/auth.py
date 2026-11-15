@@ -101,6 +101,7 @@ def clear_auth_cookies(response: Response):
 
 
 PHONE_PREFIX = "phone_"
+WHATSAPP_PREFIX = "wa_"
 
 
 def _issue_challenge(
@@ -111,7 +112,7 @@ def _issue_challenge(
 ) -> dict:
     """Creates a one-time code for the user, sends it and returns the challenge info."""
     db.execute(delete(LoginChallenge).where(LoginChallenge.user_id == user.id))
-    prefix = PHONE_PREFIX if channel == "phone" else ""
+    prefix = {"phone": PHONE_PREFIX, "whatsapp": WHATSAPP_PREFIX}.get(channel, "")
     challenge_id = prefix + secrets.token_urlsafe(32)
     code = otp.new_code()
     db.add(
@@ -129,6 +130,10 @@ def _issue_challenge(
         if channel == "phone":
             phone = otp.owner_phone()
             delivered_via = otp.send_sms_code(phone, code, "sign-in")
+            recipient = otp.mask_phone(phone)
+        elif channel == "whatsapp":
+            phone = otp.owner_phone()
+            delivered_via = otp.send_whatsapp_code(phone, code)
             recipient = otp.mask_phone(phone)
         else:
             delivered_via = otp.send_code(user.email, code, "sign-in")
@@ -218,9 +223,11 @@ def login(data: LoginRequest, request: Request, db: Session = Depends(get_db)):
     owner = _find_owner(db)
     if owner is None:
         raise HTTPException(status_code=503, detail="No owner account is configured. Set VIDEO_ADMIN_EMAIL in the backend settings.")
-    if data.otp_channel == "phone":
-        if not otp.phone_otp_available():
-            raise HTTPException(status_code=503, detail="Mobile OTP is not configured.")
+    if data.otp_channel in ("phone", "whatsapp"):
+        available = otp.whatsapp_otp_available() if data.otp_channel == "whatsapp" else otp.phone_otp_available()
+        if not available:
+            label = "WhatsApp" if data.otp_channel == "whatsapp" else "Mobile"
+            raise HTTPException(status_code=503, detail=f"{label} OTP is not configured.")
         if not otp.same_phone(data.phone, otp.owner_phone()):
             raise HTTPException(status_code=401, detail="This mobile number is not registered as the owner.")
     else:
@@ -266,6 +273,8 @@ def otp_options():
             else local_hint if otp.email_otp_available()
             else "Email delivery is not configured"
         ),
+        "whatsapp": otp.whatsapp_otp_available(),
+        "whatsapp_hint": None if otp.whatsapp_otp_available() else "WhatsApp delivery is not set up yet",
         "phone": otp.phone_otp_available(),
         "phone_hint": (
             None if otp.twilio_configured() or not otp.phone_otp_available()
@@ -466,9 +475,15 @@ def resend_login_code(data: OtpResendRequest, request: Request, db: Session = De
     user = db.get(User, challenge.user_id)
     if not user:
         raise HTTPException(status_code=400, detail="Please sign in again.")
-    channel = "phone" if challenge.id.startswith(PHONE_PREFIX) else "email"
+    channel = (
+        "phone" if challenge.id.startswith(PHONE_PREFIX)
+        else "whatsapp" if challenge.id.startswith(WHATSAPP_PREFIX)
+        else "email"
+    )
     if channel == "phone" and not otp.phone_otp_available():
         raise HTTPException(status_code=503, detail="Phone verification is not configured.")
+    if channel == "whatsapp" and not otp.whatsapp_otp_available():
+        raise HTTPException(status_code=503, detail="WhatsApp verification is not configured.")
     return _issue_challenge(user, db, channel, show_code=_is_local_request(request))
 
 
