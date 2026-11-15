@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { Bell, BellOff, BellRing, CheckCheck, LayoutDashboard } from "lucide-react";
 import useOwner from "../../hooks/useOwner";
 import useNotifications, {
+  dismissAlerts,
   disableAlerts,
   enableAlerts,
   markAllRead,
@@ -13,6 +14,7 @@ import { toast } from "../Toaster";
 
 export function AlertsToggle({ notifications }) {
   const { permission, alerts } = notifications;
+  const [explaining, setExplaining] = useState(false);
   if (permission === "unsupported") return null;
   if (permission === "denied") {
     return (
@@ -28,18 +30,52 @@ export function AlertsToggle({ notifications }) {
       </button>
     );
   }
+  // Declined earlier in our own prompt: don't keep asking.
+  if (alerts === "declined" && permission !== "granted" && !explaining) {
+    return (
+      <button type="button" onClick={() => setExplaining(true)} className="flex items-center gap-2 text-xs text-[#4b5966] hover:underline">
+        <BellOff size={14} aria-hidden="true" /> Alerts off
+      </button>
+    );
+  }
+  if (!explaining) {
+    return (
+      <button type="button" onClick={() => setExplaining(true)} className="flex items-center gap-2 text-xs font-semibold text-[#80602b] hover:underline">
+        <BellRing size={14} aria-hidden="true" /> Turn on alerts
+      </button>
+    );
+  }
   return (
-    <button
-      type="button"
-      onClick={async () => {
-        const result = await enableAlerts();
-        if (result === "granted") toast("Alerts turned on. We'll notify you about new updates.");
-        else if (result === "denied") toast("Alerts were not allowed.", "info");
-      }}
-      className="flex items-center gap-2 text-xs font-semibold text-[#80602b] hover:underline"
-    >
-      <BellRing size={14} aria-hidden="true" /> Turn on alerts
-    </button>
+    <div className="w-full rounded-xl bg-white p-3 text-xs leading-5 text-[#263746] shadow-sm ring-1 ring-[#e7e2d8]">
+      <p>
+        Get a browser alert for <strong>new listings, price changes, offers</strong> and updates on your enquiries,
+        even when this site is closed. You can turn it off any time.
+      </p>
+      <div className="mt-2 flex gap-2">
+        <button
+          type="button"
+          onClick={async () => {
+            const result = await enableAlerts();
+            setExplaining(false);
+            if (result === "granted") toast("Alerts turned on. We'll notify you about new updates.");
+            else if (result === "denied") toast("Alerts were not allowed. You can change this in your browser settings.", "info");
+          }}
+          className="rounded-full bg-[#142536] px-3 py-1.5 font-bold text-white hover:bg-[#c9a45c] hover:text-[#142536]"
+        >
+          Allow alerts
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            dismissAlerts();
+            setExplaining(false);
+          }}
+          className="rounded-full px-3 py-1.5 font-semibold text-[#4b5966] hover:bg-[#f3f1ec]"
+        >
+          Not now
+        </button>
+      </div>
+    </div>
   );
 }
 

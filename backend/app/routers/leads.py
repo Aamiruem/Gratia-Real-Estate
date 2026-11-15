@@ -261,6 +261,27 @@ def create_lead(
         .order_by(Lead.created_at.desc())
     ).first()
     if existing:
+        # Same enquiry again (maybe from another device): make sure this device
+        # also sees the confirmation in its notification bell.
+        device = notifications.device_hash(payload.device_token)
+        if device and not db.scalar(
+            select(Notification.id).where(
+                Notification.audience == "visitor",
+                Notification.recipient == device,
+                Notification.lead_reference == existing.reference,
+            )
+        ):
+            notifications.create(
+                db,
+                audience="visitor",
+                recipient=device,
+                kind=f"lead.{existing.kind}",
+                title=f"We received your {VISITOR_LABELS.get(existing.kind, 'enquiry')}",
+                body=f"Reference {existing.reference}. Our advisor will contact you shortly.",
+                link="/notifications",
+                lead_reference=existing.reference,
+            )
+            db.commit()
         response.status_code = status.HTTP_200_OK
         return LeadCreated(
             reference=existing.reference,

@@ -1,6 +1,7 @@
 import { useEffect, useSyncExternalStore } from "react";
 import { notificationsApi } from "../services/notificationsApi";
 import { toast } from "../components/Toaster";
+import { parseApiDate } from "../utils/format";
 
 /*
  * One shared notification store for the bell and the notifications page.
@@ -44,6 +45,7 @@ let state = {
   loading: true,
   error: "",
   server: [],
+  mine: [],
   ownerUnread: 0,
   local: load(LOCAL_KEY, []),
   readIds: new Set(load(READ_KEY, [])),
@@ -83,6 +85,18 @@ function compute() {
       createdAt: item.created_at,
       read: item.audience === "owner" ? item.is_read : state.readIds.has(keyOf(item)),
     }));
+  const mine = state.mine.map((item) => ({
+    key: `m-${item.id}`,
+    id: item.id,
+    source: "mine",
+    kind: item.kind,
+    title: item.title,
+    body: item.body,
+    link: item.link,
+    reference: item.lead_reference,
+    createdAt: item.created_at,
+    read: item.is_read,
+  }));
   const local = state.local.map((item) => ({
     key: item.id,
     id: item.id,
@@ -94,8 +108,8 @@ function compute() {
     createdAt: item.created_at,
     read: Boolean(item.read),
   }));
-  const items = [...server, ...local].sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+  const items = [...server, ...mine, ...local].sort(
+    (a, b) => parseApiDate(b.createdAt).getTime() - parseApiDate(a.createdAt).getTime(),
   );
   snapshot = {
     ...state,
@@ -151,7 +165,17 @@ async function refresh() {
   }
   refreshing = (async () => {
     try {
-      const feed = state.mode === "owner" ? await notificationsApi.ownerFeed() : await notificationsApi.publicFeed();
+      const [feed, mineFeed] = await Promise.all([
+        state.mode === "owner" ? notificationsApi.ownerFeed() : notificationsApi.publicFeed(),
+        notificationsApi.mine().catch(() => null),
+      ]);
+      if (mineFeed) {
+        const knownMine = new Set(state.mine.map((item) => item.id));
+        if (state.mine.length || latestSeen !== null) {
+          mineFeed.items.filter((item) => !knownMine.has(item.id) && !item.is_read).forEach(showSystemAlert);
+        }
+        state.mine = mineFeed.items;
+      }
       const items = feed?.items ?? [];
       if (latestSeen !== null) {
         items.filter((item) => item.id > latestSeen).reverse().forEach(showSystemAlert);
@@ -246,6 +270,7 @@ function onVisibility() {
 function start() {
   if (started || typeof window === "undefined") return;
   started = true;
+  window.setInterval(() => document.visibilityState === "visible" && refresh(), 60_000);
   refresh().then(connect);
   document.addEventListener("visibilitychange", onVisibility);
   window.addEventListener("storage", (event) => {
@@ -285,6 +310,10 @@ export async function markRead(item) {
     state.server = state.server.map((s) => (s.id === item.id ? { ...s, is_read: true } : s));
     emit();
     notificationsApi.markRead(item.id).catch(() => refresh());
+  } else if (item.source === "mine") {
+    state.mine = state.mine.map((m) => (m.id === item.id ? { ...m, is_read: true } : m));
+    emit();
+    notificationsApi.mineRead(item.id).catch(() => refresh());
   } else if (item.source === "public") {
     state.readIds = new Set(state.readIds).add(item.key);
     persistLocalState();
@@ -302,6 +331,10 @@ export async function markAllRead() {
   items.filter((item) => item.source === "public").forEach((item) => readIds.add(item.key));
   state.readIds = readIds;
   state.local = state.local.map((l) => ({ ...l, read: true }));
+  if (state.mine.some((m) => !m.is_read)) {
+    state.mine = state.mine.map((m) => ({ ...m, is_read: true }));
+    notificationsApi.mineReadAll().catch(() => refresh());
+  }
   if (state.mode === "owner") {
     state.server = state.server.map((s) => ({ ...s, is_read: true }));
     notificationsApi.markAllRead().catch(() => refresh());
@@ -315,6 +348,10 @@ export async function removeNotification(item) {
     state.server = state.server.filter((s) => s.id !== item.id);
     emit();
     notificationsApi.remove(item.id).catch(() => refresh());
+  } else if (item.source === "mine") {
+    state.mine = state.mine.filter((m) => m.id !== item.id);
+    emit();
+    notificationsApi.mineRemove(item.id).catch(() => refresh());
   } else if (item.source === "public") {
     state.hiddenIds = new Set(state.hiddenIds).add(item.key);
     persistLocalState();
@@ -326,20 +363,71 @@ export async function removeNotification(item) {
   }
 }
 
-/** Must be called from a click: asks for permission once, never automatically. */
+function base64ToBytes(base64) {
+  const padded = `${base64}${"=".repeat((4 - (base64.length % 4)) % 4)}`.replace(/-/g, "+").replace(/_/g, "/");
+  return Uint8Array.from(atob(padded), (c) => c.charCodeAt(0));
+}
+
+/** Registers for Web Push (alerts even when the site is closed) when the server supports it. */
+async function subscribePush() {
+  try {
+    if (!("serviceWorker" in navigator) || !("PushManager" in window)) return false;
+    const registration = await navigator.serviceWorker.getRegistration();
+    if (!registration) return false; // service worker runs on the live site only
+    const config = await notificationsApi.pushConfig();
+    if (!config?.enabled || !config.public_key) return false;
+    const subscription =
+      (await registration.pushManager.getSubscription()) ||
+      (await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: base64ToBytes(config.public_key) }));
+    await notificationsApi.pushSubscribe(subscription.toJSON(), state.mode === "owner" ? "staff" : "public");
+    return true;
+  } catch (error) {
+    console.warn("Push subscription failed", error);
+    return false;
+  }
+}
+
+async function unsubscribePush() {
+  try {
+    const registration = await navigator.serviceWorker?.getRegistration();
+    const subscription = await registration?.pushManager?.getSubscription();
+    if (subscription) {
+      await notificationsApi.pushUnsubscribe(subscription.endpoint).catch(() => {});
+      await subscription.unsubscribe();
+    }
+  } catch {
+    // ignore
+  }
+}
+
+/**
+ * Must be called from a click after the benefit was explained: asks for
+ * permission once. A visitor who declines is never asked again.
+ */
 export async function enableAlerts() {
   if (typeof Notification === "undefined") return "unsupported";
   let permission = Notification.permission;
   if (permission === "default") permission = await Notification.requestPermission();
-  const alerts = permission === "granted" ? "on" : "off";
+  const alerts = permission === "granted" ? "on" : "declined";
   save(ALERTS_KEY, alerts);
   set({ permission, alerts });
+  if (permission === "granted") {
+    import("../analytics/analytics").then(({ track }) => track("notification_optin"));
+    subscribePush();
+  }
   return permission;
 }
 
 export function disableAlerts() {
   save(ALERTS_KEY, "off");
   set({ alerts: "off" });
+  unsubscribePush();
+}
+
+/** "Not now": hides the prompt for good on this device. */
+export function dismissAlerts() {
+  save(ALERTS_KEY, "declined");
+  set({ alerts: "declined" });
 }
 
 export const refreshNotifications = refresh;

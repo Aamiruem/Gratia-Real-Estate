@@ -41,6 +41,30 @@ services:
         sync: false
       - key: TWILIO_FROM_NUMBER
         sync: false
+      # Public site address (links in owner alerts) and CORS for direct calls.
+      - key: PUBLIC_SITE_URL
+        value: https://www.gratiaestates.com
+      - key: FRONTEND_ORIGINS
+        value: https://www.gratiaestates.com,https://gratiaestates.com
+      # Owner phone alerts for new leads (ntfy app; long random topic name).
+      - key: NTFY_TOPIC
+        sync: false
+      # Browser push notifications: generate with `python -m app.push`.
+      - key: VAPID_PUBLIC_KEY
+        sync: false
+      - key: VAPID_PRIVATE_KEY
+        sync: false
+      - key: VAPID_SUBJECT
+        sync: false
+      # AI chat assistant (OpenAI / ChatGPT API). Leave empty to use built-in answers.
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_MODEL
+        value: gpt-4.1-mini
+      # Vercel -> Project -> Settings -> Git -> Deploy Hooks: rebuilds the sitemap
+      # when properties change in the admin panel.
+      - key: VERCEL_DEPLOY_HOOK_URL
+        sync: false
 
 databases:
   - name: gratia-db

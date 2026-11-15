@@ -27,6 +27,7 @@ import SiteSearch from "./SiteSearch";
 import NotificationBell from "./notifications/NotificationBell";
 import ShareButton from "./ShareButton";
 import InstallAppButton from "./InstallAppButton";
+import useSiteSettings from "../hooks/useSiteSettings";
 
 // Each item has its own icon colour so the menu is easy to scan.
 const nav = [
@@ -79,6 +80,7 @@ export default function Header() {
 
   return (
     <>
+      <AnnouncementBar />
       <header className="sticky top-0 z-50 w-full">
       {/* Main bar */}
       <div
@@ -89,32 +91,20 @@ export default function Header() {
             <Logo className="h-[50px] text-[18px] transition-transform duration-200 hover:scale-[1.02] sm:text-[20px]" />
           </Link>
 
-          <nav className="hidden items-center gap-1 rounded-full border border-[#eee9df] bg-[#fbfaf7] p-1.5 xl:flex" aria-label="Primary navigation">
-            {nav.map(({ label, to, icon: Icon, tone }) => {
+          {/* Text-only links with a gold underline: clean and easy to scan. */}
+          <nav className="hidden items-center gap-0.5 xl:flex" aria-label="Primary navigation">
+            {nav.map(({ label, to }) => {
               const link = (
                 <NavLink
                   to={to}
                   end={to === "/"}
                   className={({ isActive }) =>
-                    `group inline-flex items-center gap-2 whitespace-nowrap rounded-full px-3 py-2 text-[13px] font-semibold transition min-[1700px]:py-1.5 min-[1700px]:pl-1.5 min-[1700px]:pr-4 ${isActive ? "bg-[#142536] text-white shadow-md" : "text-[#263746] hover:bg-white hover:shadow-sm"}`
+                    `group relative inline-flex items-center gap-1 whitespace-nowrap px-3 py-2.5 text-[14px] font-semibold tracking-[.01em] transition-colors after:absolute after:inset-x-3 after:-bottom-px after:h-[2px] after:origin-left after:rounded-full after:bg-[#c9a45c] after:transition-transform after:duration-300 ${isActive ? "text-[#142536] after:scale-x-100" : "text-[#4b5966] after:scale-x-0 hover:text-[#142536] hover:after:scale-x-100"}`
                   }
                 >
-                  {({ isActive }) => (
-                    <>
-                      <span
-                        className={`hidden size-7 place-items-center rounded-full transition min-[1700px]:grid ${isActive ? "bg-[#c9a45c] text-[#142536]" : tone}`}
-                      >
-                        <Icon size={15} aria-hidden="true" />
-                      </span>
-                      {label}
-                      {to === "/projects" && (
-                        <ChevronDown
-                          size={14}
-                          className="-ml-1 transition group-hover:rotate-180"
-                          aria-hidden="true"
-                        />
-                      )}
-                    </>
+                  {label}
+                  {to === "/projects" && (
+                    <ChevronDown size={14} className="transition group-hover/menu:rotate-180" aria-hidden="true" />
                   )}
                 </NavLink>
               );
@@ -130,34 +120,13 @@ export default function Header() {
             <MoreMenu />
           </nav>
 
+          {/* Only the essentials on the right: search, notifications, book a visit. */}
           <div className="flex items-center gap-1.5 sm:gap-2">
-            <SiteSearch className="h-11 justify-center px-3 lg:px-4" />
-            <InstallAppButton variant="header" />
-            <div className="hidden sm:block xl:hidden min-[1440px]:block 2xl:hidden min-[1600px]:block">
-              <ShareButton
-                title="Gratia Estates | Premium Real Estate Advisory in Gurgaon"
-                text="Explore Gurgaon residential projects with Gratia Estates."
-              />
-            </div>
+            <SiteSearch className="h-11 justify-center px-3" />
             <NotificationBell />
-            <a
-              href={TEL}
-              className="hidden items-center gap-2.5 rounded-full py-1.5 pl-1.5 pr-4 transition hover:bg-[#f7f4ed] 2xl:inline-flex"
-            >
-              <span className="relative grid size-10 place-items-center rounded-full bg-[#34C759] text-white shadow-[0_6px_16px_rgba(52,199,89,.35)]">
-                <CallIcon size={19} className="call-buzz" />
-                
-              </span>
-              <span className="leading-tight">
-                <span className="block text-[10px] font-bold uppercase tracking-[.14em] text-[#80602b]">
-                  Call an advisor
-                </span>
-                <span className="text-sm font-bold text-[#142536]">{PHONE}</span>
-              </span>
-            </a>
             <Link
               to="/book-visit"
-              className="hidden items-center gap-2 whitespace-nowrap rounded-full bg-[#c9a45c] px-5 py-3 text-xs font-bold uppercase tracking-[.1em] text-[#142536] shadow-[0_6px_18px_rgba(201,164,92,.4)] transition hover:-translate-y-0.5 hover:bg-[#e1c98f] sm:inline-flex"
+              className="hidden items-center gap-2 whitespace-nowrap rounded-full bg-[#142536] px-5 py-3 text-[13px] font-bold text-white shadow-[0_6px_18px_rgba(20,37,54,.18)] transition hover:bg-[#c9a45c] hover:text-[#142536] sm:inline-flex"
             >
               <CalendarCheck size={16} aria-hidden="true" /> Book a visit
             </Link>
@@ -341,12 +310,12 @@ function MoreMenu() {
       <button
         type="button"
         aria-haspopup="true"
-        className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-2 text-[13px] font-semibold text-[#263746] transition hover:bg-white hover:shadow-sm"
+        className="inline-flex items-center gap-1 whitespace-nowrap px-3 py-2.5 text-[14px] font-semibold text-[#4b5966] transition-colors hover:text-[#142536]"
       >
-        <Ellipsis size={16} aria-hidden="true" /> More
+        More
         <ChevronDown size={14} className="transition group-hover/more:rotate-180" aria-hidden="true" />
       </button>
-      <div className="invisible absolute right-0 top-full z-50 w-56 pt-3 opacity-0 transition duration-200 group-focus-within/more:visible group-focus-within/more:opacity-100 group-hover/more:visible group-hover/more:opacity-100">
+      <div className="invisible absolute right-0 top-full z-50 w-64 pt-3 opacity-0 transition duration-200 group-focus-within/more:visible group-focus-within/more:opacity-100 group-hover/more:visible group-hover/more:opacity-100">
         <ul className="rounded-2xl border border-[#e7e2d8] bg-white p-2 shadow-[0_24px_60px_rgba(13,27,42,.18)]">
           {moreNav.map(({ label, to, icon: Icon, tone }) => (
             <li key={to}>
@@ -363,8 +332,34 @@ function MoreMenu() {
               </NavLink>
             </li>
           ))}
+          <li className="my-1 border-t border-[#efebe3]" aria-hidden="true" />
+          <li className="px-1 py-1">
+            <InstallAppButton variant="menu" className="!justify-start !border-0 !bg-transparent !px-2.5 !py-2 hover:!bg-[#f7f4ed]" />
+          </li>
+          <li className="px-1 pb-1">
+            <ShareButton
+              variant="menu"
+              align="right"
+              label="Share website"
+              title="Gratia Estates | Premium Real Estate Advisory in Gurgaon"
+              text="Discover premium residential and commercial properties with Gratia Estates. Explore properties, discover opportunities, and connect with us today."
+              className="!justify-start !border-0 !bg-transparent !px-2.5 !py-2 hover:!bg-[#f7f4ed]"
+            />
+          </li>
         </ul>
       </div>
+    </div>
+  );
+}
+
+// Optional one-line message set in Admin -> Settings.
+function AnnouncementBar() {
+  const settings = useSiteSettings();
+  const text = settings?.announcement_bar?.trim();
+  if (!text) return null;
+  return (
+    <div className="bg-[#142536] px-4 py-2 text-center text-xs font-semibold text-[#e1c98f] sm:text-sm" role="note">
+      {text}
     </div>
   );
 }

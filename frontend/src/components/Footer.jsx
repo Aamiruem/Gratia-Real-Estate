@@ -5,10 +5,12 @@ import CallIcon from "./CallIcon";
 import Logo from "./Logo";
 import { footerLegalLinks, footerSocialLinks } from "./footer/footerData";
 import InstallAppButton from "./InstallAppButton";
+import useSiteSettings from "../hooks/useSiteSettings";
+import { openCookieSettings } from "../analytics/analytics";
 import ShareButton from "./ShareButton";
 
-const SOCIAL_ICONS = { Instagram, Facebook, YouTube: Youtube, LinkedIn: Linkedin, "X (Twitter)": Twitter };
-const socials = footerSocialLinks.filter((link) => link.href);
+const SOCIAL_ICONS = { Instagram, Facebook, YouTube: Youtube, LinkedIn: Linkedin, "X (Twitter)": Twitter, "Google Business Profile": MapPin };
+const SETTING_LABELS = { instagram: "Instagram", facebook: "Facebook", youtube: "YouTube", linkedin: "LinkedIn", x: "X (Twitter)", google_business: "Google Business Profile" };
 
 const quickLinks = [
   { label: "Home", to: "/" },
@@ -42,6 +44,12 @@ const linkClass =
   "group inline-flex items-center gap-1.5 text-sm text-white/70 transition hover:text-white";
 
 export default function Footer() {
+  // Links set in Admin -> Settings win; footerData.js is the fallback.
+  const settings = useSiteSettings();
+  const fromSettings = Object.entries(settings?.social || {})
+    .filter(([, href]) => href)
+    .map(([key, href]) => ({ label: SETTING_LABELS[key] || key, href }));
+  const socials = fromSettings.length ? fromSettings : footerSocialLinks.filter((link) => link.href);
   return (
     <footer className="w-full bg-[#0f1f2e] text-white">
       <div className="container-luxury pt-10">
@@ -187,6 +195,9 @@ export default function Footer() {
                 {link.label}
               </Link>
             ))}
+            <button type="button" onClick={openCookieSettings} className="transition hover:text-white">
+              Cookie settings
+            </button>
           </nav>
           <p className="sm:ml-auto">Gurgaon &amp; Delhi-NCR</p>
         </div>

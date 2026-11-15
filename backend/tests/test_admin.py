@@ -173,3 +173,46 @@ def test_chat_and_push_degrade_gracefully_without_keys(client):
     assert client.get("/chat/status").json() == {"enabled": False}
     assert client.post("/chat", json={"messages": [{"role": "user", "content": "Hi"}]}).status_code == 503
     assert client.get("/push/config").json()["enabled"] is False
+
+
+def test_visitor_notifications_are_saved_per_device(client, outbox):
+    device = "device_key_" + "a" * 32
+    other = "device_key_" + "b" * 32
+    visit_date = (datetime.now(timezone.utc) + timedelta(days=3)).date().isoformat()
+    reference = client.post(
+        "/leads",
+        json={"kind": "visit", "name": "Kabir Rao", "phone": "9876500021", "visit_date": visit_date, "device_token": device},
+    ).json()["reference"]
+
+    mine = client.get("/notifications/mine", headers={"X-Device-Token": device}).json()
+    assert mine["unread"] == 1 and mine["items"][0]["title"] == "We received your site visit request"
+    assert reference in mine["items"][0]["body"]
+    assert client.get("/notifications/mine", headers={"X-Device-Token": other}).json()["items"] == []
+    assert client.get("/notifications/mine").status_code == 400
+    # Visitor messages never appear in the public feed.
+    assert client.get("/notifications/public").json()["items"] == []
+
+    sign_in(client, outbox)
+    client.patch(f"/leads/{reference}", json={"status": "confirmed"})
+    owner_titles = [n["title"] for n in client.get("/notifications").json()["items"]]
+    assert "Your visit is confirmed" not in owner_titles
+    client.cookies.clear()
+
+    mine = client.get("/notifications/mine", headers={"X-Device-Token": device}).json()
+    assert [n["title"] for n in mine["items"]][0] == "Your visit is confirmed"
+    first = mine["items"][0]["id"]
+    assert client.patch(f"/notifications/mine/{first}", json={"is_read": True}, headers={"X-Device-Token": other}).status_code == 404
+    assert client.patch(f"/notifications/mine/{first}", json={"is_read": True}, headers={"X-Device-Token": device}).json()["is_read"]
+    assert client.post("/notifications/mine/read-all", headers={"X-Device-Token": device}).status_code == 204
+    assert client.delete(f"/notifications/mine/{first}", headers={"X-Device-Token": device}).status_code == 204
+    assert len(client.get("/notifications/mine", headers={"X-Device-Token": device}).json()["items"]) == 1
+
+
+def test_duplicate_from_another_device_still_gets_confirmation(client):
+    body = {"kind": "callback", "name": "Nisha Jain", "phone": "9876500031"}
+    first = client.post("/leads", json={**body, "device_token": "device_one_" + "c" * 32}).json()
+    second = client.post("/leads", json={**body, "device_token": "device_two_" + "d" * 32}).json()
+    assert second["duplicate"] and second["reference"] == first["reference"]
+    for device in ("device_one_" + "c" * 32, "device_two_" + "d" * 32):
+        items = client.get("/notifications/mine", headers={"X-Device-Token": device}).json()["items"]
+        assert len(items) == 1 and first["reference"] in items[0]["body"]

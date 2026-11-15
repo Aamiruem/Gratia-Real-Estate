@@ -22,6 +22,7 @@ import useOwner from "../hooks/useOwner";
 import useNotifications from "../hooks/useNotifications";
 import { leadsAdminApi } from "../services/leadsApi";
 import { notificationsApi } from "../services/notificationsApi";
+import { adminApi } from "../admin/api";
 import { projects } from "../data/projects";
 import { timeAgo } from "../utils/format";
 
@@ -64,8 +65,9 @@ const formatDay = (iso) =>
 const whatsappLink = (phone, name) =>
   `https://api.whatsapp.com/send?phone=${phone.replace(/\D/g, "")}&text=${encodeURIComponent(`Hello ${name}, this is Gratia Estates regarding your enquiry.`)}`;
 
-export default function LeadsAdmin() {
-  const { checked, isOwner } = useOwner();
+export default function LeadsAdmin({ embedded = false }) {
+  const { checked, isStaff: isOwner } = useOwner();
+  if (embedded) return <Dashboard embedded />;
   if (!checked) {
     return (
       <div className="container-luxury flex min-h-[50vh] items-center justify-center">
@@ -91,7 +93,7 @@ export default function LeadsAdmin() {
   return <Dashboard />;
 }
 
-function Dashboard() {
+function Dashboard({ embedded = false }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const focusRef = searchParams.get("lead") || "";
   const [tab, setTab] = useState(focusRef ? "" : "enquiries");
@@ -103,6 +105,10 @@ function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const { items: notificationItems } = useNotifications();
+  const [team, setTeam] = useState([]);
+  useEffect(() => {
+    adminApi.team().then((members) => setTeam(members.filter((m) => m.is_active)), () => {});
+  }, []);
   const newestNotification = notificationItems.find((item) => item.source === "owner")?.id ?? 0;
 
   const load = useCallback(async () => {
@@ -129,12 +135,22 @@ function Dashboard() {
 
   const statuses = tab === "appointments" ? VISIT_STATUSES : tab === "enquiries" ? LEAD_STATUSES : [...LEAD_STATUSES, ...VISIT_STATUSES.slice(1)];
 
-  const updateLead = async (reference, changes) => {
+  const updateLead = async (reference, changes, reloadOnly = false) => {
+    if (reloadOnly) {
+      load();
+      return;
+    }
     try {
       const updated = await leadsAdminApi.update(reference, changes);
       setData((current) => ({ ...current, items: current.items.map((item) => (item.reference === reference ? updated : item)) }));
       leadsAdminApi.stats().then(setStats, () => {});
-      toast(changes.owner_notes !== undefined ? "Notes saved" : `Status changed to ${label(updated.status)}`);
+      toast(
+        changes.owner_notes !== undefined
+          ? "Notes saved"
+          : changes.assigned_to_id !== undefined
+            ? "Assignment saved"
+            : `Status changed to ${label(updated.status)}`,
+      );
     } catch (err) {
       toast(err.message, "error");
     }
@@ -153,8 +169,8 @@ function Dashboard() {
   return (
     <>
       <SEO title="Leads dashboard | Gratia Estates" description="Private owner dashboard." path="/admin/leads" noindex />
-      <section className="bg-[#f7f4ed] py-10 sm:py-12">
-        <div className="container-luxury">
+      <section className={embedded ? "pb-2" : "bg-[#f7f4ed] py-10 sm:py-12"}>
+        <div className={embedded ? "" : "container-luxury"}>
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div>
               <p className="text-[11px] font-bold uppercase tracking-[.2em] text-[#80602b]">Owner dashboard</p>
@@ -192,8 +208,8 @@ function Dashboard() {
         </div>
       </section>
 
-      <section className="py-8 sm:py-10">
-        <div className="container-luxury grid gap-8 xl:grid-cols-[1fr_340px]">
+      <section className={embedded ? "py-6" : "py-8 sm:py-10"}>
+        <div className={embedded ? "grid gap-8" : "container-luxury grid gap-8 xl:grid-cols-[1fr_340px]"}>
           <div className="min-w-0">
             <div className="flex flex-wrap gap-2" role="tablist" aria-label="Lead type">
               {TABS.map(({ id, label: name, Icon }) => (
@@ -256,7 +272,7 @@ function Dashboard() {
 
             <ul className="mt-3 space-y-3">
               {data.items.map((lead) => (
-                <LeadCard key={lead.reference} lead={lead} highlighted={lead.reference === focusRef} onUpdate={updateLead} />
+                <LeadCard key={lead.reference} lead={lead} team={team} highlighted={lead.reference === focusRef} onUpdate={updateLead} />
               ))}
             </ul>
             {!loading && !data.items.length && !error && (
@@ -268,16 +284,17 @@ function Dashboard() {
             )}
           </div>
 
-          <AnnounceForm />
+          {!embedded && <AnnounceForm />}
         </div>
       </section>
     </>
   );
 }
 
-function LeadCard({ lead, highlighted, onUpdate }) {
+function LeadCard({ lead, team, highlighted, onUpdate }) {
   const [notes, setNotes] = useState(lead.owner_notes);
   const [showNotes, setShowNotes] = useState(Boolean(lead.owner_notes));
+  const [showHistory, setShowHistory] = useState(highlighted);
   const appointment = APPOINTMENT_KINDS.has(lead.kind);
   const statuses = appointment ? VISIT_STATUSES : LEAD_STATUSES;
   const details = [
@@ -287,6 +304,9 @@ function LeadCard({ lead, highlighted, onUpdate }) {
     ["Type", lead.property_type],
     ["Visitors", lead.visitors],
     ["Contact via", lead.contact_method],
+    ["Requirement", lead.requirement && lead.requirement.replace(/^\w/, (c) => c.toUpperCase())],
+    ["Best time to call", lead.contact_time],
+    ["Source", lead.source],
   ].filter(([, value]) => value);
 
   return (
@@ -350,6 +370,33 @@ function LeadCard({ lead, highlighted, onUpdate }) {
       )}
       {lead.message && <p className="mt-3 whitespace-pre-line rounded-xl bg-[#fbfaf7] px-3 py-2 text-sm leading-6 text-[#263746]">{lead.message}</p>}
 
+      <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-[#efebe3] pt-3 text-xs">
+        <label className="inline-flex items-center gap-2 font-semibold text-[#142536]">
+          Assigned to
+          <select
+            value={lead.assigned_to_id ?? 0}
+            onChange={(event) => onUpdate(lead.reference, { assigned_to_id: Number(event.target.value) })}
+            className="rounded-full border border-[#d9dce0] bg-white px-3 py-1.5 text-xs font-semibold"
+          >
+            <option value={0}>Unassigned</option>
+            {team.map((member) => (
+              <option key={member.id} value={member.id}>
+                {member.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        {lead.follow_up_at && (
+          <span className={`rounded-full px-2.5 py-1 font-bold ${new Date(lead.follow_up_at) < new Date() ? "bg-rose-100 text-rose-800" : "bg-sky-100 text-sky-800"}`}>
+            Follow-up {new Date(lead.follow_up_at).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}
+          </span>
+        )}
+        <button type="button" onClick={() => setShowHistory((v) => !v)} className="font-bold text-[#80602b] hover:underline">
+          {showHistory ? "Hide follow-ups" : "Follow-ups & history"}
+        </button>
+      </div>
+      {showHistory && <FollowUpPanel lead={lead} statuses={statuses} onChanged={(changes) => onUpdate(lead.reference, changes, true)} />}
+
       <div className="mt-3">
         {showNotes ? (
           <form
@@ -383,11 +430,94 @@ function LeadCard({ lead, highlighted, onUpdate }) {
   );
 }
 
-function AnnounceForm() {
+function FollowUpPanel({ lead, statuses, onChanged }) {
+  const [history, setHistory] = useState(null);
+  const [note, setNote] = useState("");
+  const [next, setNext] = useState("");
+  const [status, setStatus] = useState("");
+  const [saving, setSaving] = useState(false);
+  const load = () => adminApi.leadFollowUps(lead.reference).then(setHistory, () => setHistory([]));
+  useEffect(() => {
+    load();
+  }, [lead.reference]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const submit = async (event) => {
+    event.preventDefault();
+    if (note.trim().length < 2) return;
+    setSaving(true);
+    try {
+      await adminApi.addFollowUp(lead.reference, {
+        note: note.trim(),
+        next_action_at: next ? new Date(next).toISOString() : null,
+        status: status || null,
+      });
+      setNote("");
+      setNext("");
+      setStatus("");
+      load();
+      onChanged({});
+      toast("Follow-up saved");
+    } catch (err) {
+      toast(err.message, "error");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const field = "rounded-xl border border-[#d9dce0] bg-white px-3 py-2 text-sm text-[#142536] outline-none focus:border-[#c9a45c]";
+  return (
+    <div className="mt-3 rounded-xl bg-[#fbfaf7] p-3">
+      <form onSubmit={submit} className="grid gap-2 sm:grid-cols-[1fr_auto_auto_auto]">
+        <label className="sm:col-span-4">
+          <span className="sr-only">Follow-up note</span>
+          <textarea rows={2} value={note} onChange={(e) => setNote(e.target.value)} placeholder="What happened? e.g. Called, shared floor plans, visit on Saturday" className={`${field} w-full`} />
+        </label>
+        <label className="text-xs font-semibold text-[#142536]">
+          Next follow-up
+          <input type="datetime-local" value={next} onChange={(e) => setNext(e.target.value)} className={`${field} mt-1 block`} />
+        </label>
+        <label className="text-xs font-semibold text-[#142536]">
+          Update status
+          <select value={status} onChange={(e) => setStatus(e.target.value)} className={`${field} mt-1 block`}>
+            <option value="">No change</option>
+            {statuses.map((value) => (
+              <option key={value} value={value}>
+                {label(value)}
+              </option>
+            ))}
+          </select>
+        </label>
+        <button type="submit" disabled={saving || note.trim().length < 2} className="self-end rounded-full bg-[#142536] px-4 py-2 text-xs font-bold text-white hover:bg-[#c9a45c] hover:text-[#142536] disabled:opacity-50">
+          Save follow-up
+        </button>
+      </form>
+      <ol className="mt-3 space-y-2">
+        {history === null ? (
+          <li className="text-xs text-[#5e6872]">Loading history…</li>
+        ) : history.length ? (
+          history.map((entry) => (
+            <li key={entry.id} className="rounded-lg bg-white px-3 py-2 text-sm ring-1 ring-[#efebe3]">
+              <p className="whitespace-pre-line text-[#263746]">{entry.note}</p>
+              <p className="mt-1 text-[11px] text-[#5e6872]">
+                {entry.author_name || "Team"} · {timeAgo(entry.created_at)}
+                {entry.next_action_at && ` · next: ${new Date(entry.next_action_at).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}`}
+              </p>
+            </li>
+          ))
+        ) : (
+          <li className="text-xs text-[#5e6872]">No follow-ups yet.</li>
+        )}
+      </ol>
+    </div>
+  );
+}
+
+export function AnnounceForm() {
   const [slug, setSlug] = useState("");
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [sending, setSending] = useState(false);
+  const [kind, setKind] = useState("");
   const project = useMemo(() => projects.find((p) => p.slug === slug), [slug]);
 
   const choose = (value) => {
@@ -405,7 +535,7 @@ function AnnounceForm() {
     setSending(true);
     try {
       await notificationsApi.announce({
-        kind: project ? "property.added" : "announcement",
+        kind: kind || (project ? "property.added" : "announcement"),
         title: title.trim(),
         body: body.trim(),
         link: project ? `/projects/${project.slug}` : null,
@@ -439,6 +569,16 @@ function AnnounceForm() {
                 {p.name}
               </option>
             ))}
+          </select>
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-xs font-bold text-[#142536]">Type</span>
+          <select value={kind} onChange={(event) => setKind(event.target.value)} className={field}>
+            <option value="">{project ? "New listing" : "Important announcement"}</option>
+            <option value="property.price">Price update</option>
+            <option value="property.offer">New offer</option>
+            <option value="property.availability">Availability update</option>
+            <option value="announcement">Important announcement</option>
           </select>
         </label>
         <label className="block">

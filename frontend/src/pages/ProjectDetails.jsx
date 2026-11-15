@@ -174,8 +174,8 @@ export default function ProjectDetails() {
   return (
     <>
       <SEO
-        title={`${project.name} ${project.location} | Price, Status & Details | Gratia Estates`}
-        description={`${project.name} by ${project.developer} in ${project.location}: ${project.status.toLowerCase()} ${project.type.toLowerCase()} homes, ${project.price}. See highlights, amenities and location, and book a site visit with Gratia Estates.`}
+        title={project.seoTitle || `${project.name} ${project.location} | Price, Status & Details | Gratia Estates`}
+        description={project.seoDescription || `${project.name} by ${project.developer} in ${project.location}: ${project.status.toLowerCase()} ${project.type.toLowerCase()} homes, ${project.price}. See highlights, amenities and location, and book a site visit with Gratia Estates.`}
         path={`/projects/${project.slug}`}
         image={project.image}
       />

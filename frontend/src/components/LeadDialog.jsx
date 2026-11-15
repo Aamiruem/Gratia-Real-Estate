@@ -60,6 +60,9 @@ const empty = {
   budget: "",
   visit_date: "",
   visit_time: "",
+  requirement: "",
+  property_type: "",
+  contact_time: "",
   message: "",
   website: "",
 };
@@ -241,6 +244,25 @@ function LeadDialog({ options, onClose }) {
                   <input id="lead-phone" type="tel" inputMode="tel" className={input} autoComplete="tel" placeholder="10-digit mobile number" value={values.phone} onChange={set("phone")} {...aria("phone")} />
                   {errorText("phone")}
                 </label>
+                <label className="block" htmlFor="lead-requirement">
+                  <span className={labelText}>I want to</span>
+                  <select id="lead-requirement" className={input} value={values.requirement} onChange={set("requirement")}>
+                    <option value="">Choose</option>
+                    <option value="buy">Buy</option>
+                    <option value="sell">Sell</option>
+                    <option value="rent">Rent / lease</option>
+                    <option value="invest">Invest</option>
+                  </select>
+                </label>
+                <label className="block" htmlFor="lead-contact-time">
+                  <span className={labelText}>Best time to call</span>
+                  <select id="lead-contact-time" className={input} value={values.contact_time} onChange={set("contact_time")}>
+                    <option value="">Any time</option>
+                    <option>Morning (9 AM – 12 PM)</option>
+                    <option>Afternoon (12 PM – 4 PM)</option>
+                    <option>Evening (4 PM – 8 PM)</option>
+                  </select>
+                </label>
                 <label className="block sm:col-span-2" htmlFor="lead-email">
                   <span className={labelText}>
                     Email address <span className="font-normal text-charcoal/70">(optional)</span>
@@ -266,6 +288,18 @@ function LeadDialog({ options, onClose }) {
                     <label className="block" htmlFor="lead-location">
                       <span className={labelText}>Preferred location</span>
                       <input id="lead-location" className={input} maxLength={150} placeholder="e.g. Dwarka Expressway" value={values.location} onChange={set("location")} />
+                    </label>
+                    <label className="block" htmlFor="lead-type">
+                      <span className={labelText}>Property type</span>
+                      <select id="lead-type" className={input} value={values.property_type} onChange={set("property_type")}>
+                        <option value="">Any</option>
+                        <option>Apartment / flat</option>
+                        <option>Luxury home</option>
+                        <option>Villa / builder floor</option>
+                        <option>Plot</option>
+                        <option>Office space</option>
+                        <option>Retail / SCO</option>
+                      </select>
                     </label>
                     <label className="block" htmlFor="lead-budget">
                       <span className={labelText}>Budget</span>

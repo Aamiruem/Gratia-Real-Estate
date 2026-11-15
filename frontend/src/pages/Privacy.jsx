@@ -31,6 +31,13 @@ const privacySections = [
     ],
   },
   {
+    title: "Cookies, analytics and notifications",
+    body: [
+      "With your consent we use analytics cookies (Google Analytics 4 and our own first-party analytics) to understand which pages and properties are useful. We never send your name, phone number, email or form contents to analytics. See our Cookie Policy at /cookie-policy; you can change your choice any time via Cookie settings in the footer.",
+      "Confirmations and updates about your enquiries are saved with a random device key so they appear in this browser's notification bell. Browser alerts are sent only if you turn them on.",
+    ],
+  },
+  {
     title: "Data security and retention",
     body: [
       "We take reasonable steps to protect your information from unauthorised access, misuse, loss or disclosure. However, no website, messaging platform or internet transmission can be guaranteed to be completely secure.",

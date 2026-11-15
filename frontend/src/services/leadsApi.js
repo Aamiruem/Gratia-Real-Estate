@@ -1,20 +1,19 @@
 import { apiRequest, backendUrl } from "./apiClient";
-import { addLocalNotification } from "../hooks/useNotifications";
+import { refreshNotifications } from "../hooks/useNotifications";
+import { getDeviceKey } from "../utils/deviceKey";
 import { getTrafficSource, track } from "../analytics/analytics";
 
-const KIND_LABELS = {
-  contact: "enquiry",
-  visit: "site visit request",
-  callback: "callback request",
-  property_enquiry: "property enquiry",
-  consultation: "consultation request",
-  whatsapp: "WhatsApp enquiry",
-};
 
 // Turns form values into the API body; empty strings are left out.
 function body(kind, fields) {
   // Source = how the visitor arrived (organic, social, direct...): no personal data.
-  const payload = { kind, source_page: window.location.pathname, source: getTrafficSource().source };
+  const payload = {
+    kind,
+    source_page: window.location.pathname,
+    source: getTrafficSource().source,
+    // The confirmation is saved in the database for this device's notification bell.
+    device_token: getDeviceKey() || undefined,
+  };
   for (const [key, value] of Object.entries(fields)) {
     if (value === undefined || value === null) continue;
     const text = typeof value === "string" ? value.trim() : value;
@@ -35,14 +34,7 @@ export async function submitLead(kind, fields) {
   });
   if (result?.reference) {
     track("lead_submit", { detail: kind, property_slug: fields.property_slug });
-    const label = KIND_LABELS[kind] ?? "enquiry";
-    addLocalNotification({
-      id: `lead-${result.reference}`,
-      kind: `lead.${kind}`,
-      title: `We received your ${label}`,
-      body: `Reference ${result.reference}. Our advisor will contact you shortly.`,
-      link: kind === "visit" ? "/book-visit" : "/contact",
-    });
+    refreshNotifications();
   }
   return result;
 }

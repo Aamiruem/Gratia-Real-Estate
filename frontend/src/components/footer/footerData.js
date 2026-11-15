@@ -28,6 +28,7 @@ export const footerAddress = {
 export const footerLegalLinks = [
   { label: "Privacy Policy", to: "/privacy-policy" },
   { label: "Terms & Conditions", to: "/terms-conditions" },
+  { label: "Cookie Policy", to: "/cookie-policy" },
 ];
 
 // Social media profiles shown in the footer. Add the full profile URL to show

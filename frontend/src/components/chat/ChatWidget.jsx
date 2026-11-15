@@ -2,6 +2,13 @@ import { ArrowUpRight, MessageSquareText, SendHorizontal, X } from "lucide-react
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { answer, GREETING, QUICK_REPLIES } from "./supportBot";
+import { apiRequest } from "../../services/apiClient";
+
+// AI answers (OpenAI) when the backend has them switched on; otherwise the
+// built-in answers in supportBot.js. Checked once per page load.
+let aiStatus = null;
+const aiEnabled = () =>
+  (aiStatus = aiStatus ?? apiRequest("/chat/status").then((s) => Boolean(s?.enabled), () => false));
 
 // Short pause so replies feel conversational; answers are computed instantly.
 const REPLY_DELAY_MS = 350;
@@ -28,12 +35,33 @@ export default function ChatWidget() {
     return () => window.removeEventListener("keydown", onKey);
   }, [open]);
 
-  const send = (text) => {
+  const send = async (text) => {
     const question = text.trim();
     if (!question || typing) return;
-    setMessages((current) => [...current, { from: "user", text: question }]);
+    const history = [...messages, { from: "user", text: question }];
+    setMessages(history);
     setInput("");
     setTyping(true);
+    if (await aiEnabled()) {
+      try {
+        const { reply } = await apiRequest("/chat", {
+          method: "POST",
+          body: JSON.stringify({
+            messages: history
+              .filter((m) => m.text)
+              .slice(-10)
+              .map((m) => ({ role: m.from === "user" ? "user" : "assistant", content: String(m.text).slice(0, 1000) })),
+          }),
+        });
+        // Keep the built-in quick links (projects, booking) under the AI reply.
+        const builtIn = answer(question);
+        setMessages((current) => [...current, { from: "bot", ...builtIn, text: reply, ai: true }]);
+        setTyping(false);
+        return;
+      } catch {
+        // Fall through to the built-in answers.
+      }
+    }
     window.setTimeout(() => {
       setMessages((current) => [...current, { from: "bot", ...answer(question) }]);
       setTyping(false);
@@ -156,7 +184,7 @@ export default function ChatWidget() {
 function BotMessage({ message, onQuick, onNavigate, showQuick }) {
   return (
     <div className="max-w-[92%] space-y-2">
-      <p className="w-fit rounded-2xl rounded-bl-md bg-white px-4 py-2.5 text-sm leading-6 text-[#142536] shadow-sm">
+      <p className="w-fit whitespace-pre-line rounded-2xl rounded-bl-md bg-white px-4 py-2.5 text-sm leading-6 text-[#142536] shadow-sm">
         {message.text}
       </p>
       {message.links?.length > 0 && (

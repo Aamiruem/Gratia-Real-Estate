@@ -7,8 +7,16 @@ export function formatDate(date) {
 }
 
 // "just now", "5 min ago", "3 h ago", "2 days ago", then a short date.
+// API times are UTC; some databases return them without a "Z": treat those as UTC.
+export function parseApiDate(value) {
+  if (typeof value === "string" && /T\d{2}:\d{2}/.test(value) && !/(Z|[+-]\d{2}:?\d{2})$/.test(value)) {
+    return new Date(`${value}Z`);
+  }
+  return new Date(value);
+}
+
 export function timeAgo(value) {
-  const then = new Date(value).getTime();
+  const then = parseApiDate(value).getTime();
   if (Number.isNaN(then)) return "";
   const seconds = Math.max(0, Math.round((Date.now() - then) / 1000));
   if (seconds < 45) return "just now";

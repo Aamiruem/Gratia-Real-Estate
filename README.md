@@ -140,3 +140,29 @@ With `NTFY_TOPIC` set, each new lead also alerts the owner's phone.
 `public/offline.html` make the site installable on Android, iPhone/iPad,
 Windows and macOS. The service worker is registered only in production builds
 (`npm run build` + `npm run preview`, or the deployed site), never in `npm run dev`.
+
+## Admin panel, analytics and deployment
+
+**Admin panel** (`/admin`, private, not linked publicly, `noindex`): sign in at
+`/video-admin/login`. Modules: Overview, Properties (add / edit / publish /
+unpublish / feature / delete), Customers, Leads (status, assignment, notes,
+follow-up timeline, CSV export), Follow-ups, Notifications (history and
+announcements), Analytics & traffic sources, Enquiry reports, SEO, Users &
+team, Settings. Roles: **owner** and **admin** manage everything; **agent**
+works leads, customers and follow-ups. Team members sign in with an email code.
+
+**Notifications** are saved in the PostgreSQL database: team notifications,
+public announcements (new listing, price update, offer, availability) and each
+visitor's own enquiry confirmations and status updates (tied to a random
+device key). Optional browser push (VAPID keys) and owner phone alerts (ntfy).
+
+**Analytics**: consent banner; GA4 (`VITE_GA_MEASUREMENT_ID`) and first-party
+events load only after "Accept". No personal data is sent.
+
+**AI chat assistant**: set `OPENAI_API_KEY` on the backend; otherwise the chat
+uses its built-in answers.
+
+Guides:
+- [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md): Vercel + GoDaddy DNS, Render/AWS database, shared hosting, VPS
+- [docs/SEO_ANALYTICS_GUIDE.md](docs/SEO_ANALYTICS_GUIDE.md): Search Console verification, sitemap, GA4
+- [docs/TESTING_CHECKLIST.md](docs/TESTING_CHECKLIST.md): production testing checklist

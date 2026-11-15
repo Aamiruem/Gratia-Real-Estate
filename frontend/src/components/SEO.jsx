@@ -35,6 +35,8 @@ export default function SEO({
     };
 
     setMeta("description", description);
+    setMeta("twitter:title", title);
+    setMeta("twitter:description", description);
     // Private pages (e.g. owner sign-in) are kept out of search results.
     setMeta("robots", noindex ? "noindex, nofollow" : "index, follow, max-image-preview:large");
 

@@ -414,6 +414,8 @@ function EnquiryForm() {
     location: "",
     propertyType: "",
     timeline: "",
+    requirement: "",
+    contactTime: "",
     message: "",
   });
   const [errors, setErrors] = useState({});
@@ -447,6 +449,8 @@ function EnquiryForm() {
       budget: form.budget,
       location: form.location,
       property_type: form.propertyType,
+      requirement: form.requirement,
+      contact_time: form.contactTime,
       message: [form.timeline && `Buying timeline: ${form.timeline}`, form.message].filter(Boolean).join(" | "),
     });
     openWhatsApp(
@@ -511,6 +515,22 @@ function EnquiryForm() {
           options={["Apartment / Flat", "Luxury residence", "Builder floor", "Villa / Independent home", "Plot", "Open to suggestions"]}
           placeholder="Choose property type"
           icon={Building2}
+        />
+        <SelectField
+          label="I want to"
+          value={form.requirement}
+          onChange={(v) => updateField("requirement", v)}
+          options={["buy", "sell", "rent", "invest"]}
+          placeholder="Buy, sell, rent or invest?"
+          icon={Building2}
+        />
+        <SelectField
+          label="Best time to call"
+          value={form.contactTime}
+          onChange={(v) => updateField("contactTime", v)}
+          options={["Morning (9 AM – 12 PM)", "Afternoon (12 PM – 4 PM)", "Evening (4 PM – 8 PM)"]}
+          placeholder="Any time"
+          icon={CalendarCheck}
         />
         <SelectField
           label="Buying timeline"

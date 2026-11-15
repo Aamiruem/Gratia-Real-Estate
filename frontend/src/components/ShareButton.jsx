@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { Copy, Facebook, Mail, MessageCircle, Share2, Smartphone } from "lucide-react";
+import { Copy, Facebook, Mail, MessageCircle, Send, Share2, Smartphone } from "lucide-react";
 import { toast } from "./Toaster";
+import { track } from "../analytics/analytics";
 
 async function copyText(text) {
   try {
@@ -44,7 +45,7 @@ const TRIGGERS = {
 export default function ShareButton({
   url,
   title = "Gratia Estates",
-  text = "Premium real estate advisory in Gurgaon",
+  text = "Discover premium residential and commercial properties with Gratia Estates. Explore properties, discover opportunities, and connect with us today.",
   variant = "icon",
   label = "Share",
   align = "right",
@@ -69,6 +70,7 @@ export default function ShareButton({
   const nativeShare = async () => {
     try {
       await navigator.share({ title, text, url: shareUrl() });
+      track("share", { detail: "native" });
       return true;
     } catch (error) {
       return error?.name === "AbortError"; // the person closed the sheet
@@ -84,11 +86,12 @@ export default function ShareButton({
 
   const copy = async () => {
     const ok = await copyText(shareUrl());
+    if (ok) track("share", { detail: "copy_link" });
     toast(ok ? "Link copied to clipboard" : "Couldn't copy the link. Please copy it from the address bar.", ok ? "success" : "error");
     setOpen(false);
   };
 
-  const message = `${title}\n${shareUrl()}`;
+  const message = `${text}\n${shareUrl()}`;
   const links = [
     {
       label: "WhatsApp",
@@ -101,6 +104,12 @@ export default function ShareButton({
       Icon: Facebook,
       tone: "bg-blue-100 text-blue-700",
       href: () => `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl())}`,
+    },
+    {
+      label: "Telegram",
+      Icon: Send,
+      tone: "bg-sky-100 text-sky-700",
+      href: () => `https://t.me/share/url?url=${encodeURIComponent(shareUrl())}&text=${encodeURIComponent(text)}`,
     },
     {
       label: "Email",
@@ -165,7 +174,10 @@ export default function ShareButton({
               target={name === "Email" ? undefined : "_blank"}
               rel="noopener noreferrer"
               className={item}
-              onClick={() => setOpen(false)}
+              onClick={() => {
+                track("share", { detail: name.toLowerCase() });
+                setOpen(false);
+              }}
             >
               <span className={`grid size-8 place-items-center rounded-lg ${tone}`}>
                 <Icon size={16} aria-hidden="true" />
