@@ -291,6 +291,9 @@ class MemberCreate(BaseModel):
     name: str = Field(min_length=2, max_length=100)
     email: EmailStr
     role: Literal["admin", "agent"] = "agent"
+    # Optional to preserve email-code onboarding for teams that prefer it.
+    # When supplied, the member can use normal email/password sign-in right away.
+    password: Optional[str] = Field(default=None, min_length=1, max_length=128)
 
 
 class MemberUpdate(BaseModel):
@@ -318,8 +321,22 @@ def add_member(payload: MemberCreate, db: Session = Depends(get_db), manager: Us
     email = str(payload.email).lower()
     if db.scalar(select(User.id).where(func.lower(User.email) == email)):
         raise HTTPException(status_code=409, detail="A user with this email already exists.")
-    # Sign-in is by one-time email code, so this password is random and never used.
-    user = User(name=payload.name.strip(), email=email, role=payload.role, password_hash=hash_password(secrets.token_urlsafe(32)))
+    password_set_at = None
+    if payload.password is not None:
+        from .password_auth import check_password_strength
+
+        check_password_strength(payload.password, email)
+        password_hash = hash_password(payload.password)
+        password_set_at = datetime.now(timezone.utc)
+    else:
+        password_hash = hash_password(secrets.token_urlsafe(32))
+    user = User(
+        name=payload.name.strip(),
+        email=email,
+        role=payload.role,
+        password_hash=password_hash,
+        password_set_at=password_set_at,
+    )
     db.add(user)
     db.commit()
     db.refresh(user)
