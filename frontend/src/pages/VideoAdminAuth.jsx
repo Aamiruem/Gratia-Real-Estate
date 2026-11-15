@@ -1,15 +1,19 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, Loader2, LockKeyhole, MailCheck, RotateCw, ShieldCheck, Smartphone } from "lucide-react";
+import { ArrowLeft, KeyRound, Loader2, LockKeyhole, MailCheck, RotateCw, ShieldCheck, Smartphone } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import Logo from "../components/Logo";
 import SEO from "../components/SEO";
 import { authApi } from "../services/authApi";
+import PasswordSignIn from "../components/auth/PasswordSignIn";
+import { notifyAuthChanged } from "../hooks/useOwner";
 
 const inputClass =
   "w-full rounded-xl border border-[#d9dce0] bg-[#fbfaf7] px-4 py-3.5 text-sm text-[#142536] outline-none transition placeholder:text-[#9ba2a9] focus:border-[#c9a45c] focus:bg-white focus:ring-4 focus:ring-[#c9a45c]/15";
 
 export default function VideoAdminAuth() {
   const navigate = useNavigate();
+  // "password" (email + password) or "code" (one-time code to email/phone).
+  const [method, setMethod] = useState("password");
   const [otpChannel, setOtpChannel] = useState("email");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
@@ -46,6 +50,7 @@ export default function VideoAdminAuth() {
       await authApi.logout();
       throw new Error("This account does not have access to the admin panel.");
     }
+    notifyAuthChanged(); // header, admin sidebar and notifications pick up the new session
     // Back to the page that asked for sign-in (e.g. /admin/leads), else the admin panel.
     const next = new URLSearchParams(window.location.search).get("next");
     navigate(next && next.startsWith("/") && !next.startsWith("//") ? next : "/admin", { replace: true });
@@ -84,8 +89,8 @@ export default function VideoAdminAuth() {
   return (
     <>
       <SEO
-        title="Owner sign-in | Gratia Estates"
-        description="Secure owner access for managing the Gratia Estates video library."
+        title="Admin sign-in | Gratia Estates"
+        description="Secure staff access to the Gratia Estates admin panel."
         path="/video-admin/login"
         noindex
       />
@@ -109,19 +114,19 @@ export default function VideoAdminAuth() {
                 <Logo variant="light" className="h-12 text-[18px]" />
               </Link>
               <p className="mt-10 text-xs font-bold uppercase tracking-[.2em] text-[#e1c98f]">
-                Video library
+                Admin panel
               </p>
               <h1 className="mt-4 max-w-md font-display text-3xl font-semibold leading-tight text-white sm:text-4xl">
-                Welcome back to your video library.
+                Welcome back to Gratia Estates.
               </h1>
-              <p className="mt-5 max-w-md text-sm leading-7 text-white/70">
-                No password needed. Sign in with a one-time code sent to your owner email or mobile number.
+              <p className="mt-5 max-w-md text-sm leading-7 text-white/75">
+                Sign in with your password, or with a one-time code sent to your registered email or mobile number.
               </p>
             </div>
             <div className="relative mt-10 flex items-start gap-3 rounded-2xl border border-white/10 bg-white/[.06] p-4">
               <ShieldCheck size={21} className="mt-0.5 shrink-0 text-[#e1c98f]" aria-hidden="true" />
               <p className="text-xs leading-5 text-white/75">
-                Only the owner&apos;s registered email or mobile number can receive a sign-in code.
+                Only registered staff accounts can sign in. Repeated wrong passwords lock password sign-in for 15 minutes.
               </p>
             </div>
           </aside>
@@ -132,17 +137,42 @@ export default function VideoAdminAuth() {
               Secure owner access
             </div>
             <h2 className="font-display text-3xl font-semibold text-[#142536] sm:text-4xl">Sign in</h2>
-            <p className="mt-3 text-sm leading-6 text-[#68737e]">
-              Choose where to receive your one-time code.
-            </p>
 
-            {error && (
+            {!challenge && (
+              <div className="mt-6 grid grid-cols-2 gap-1 rounded-full bg-[#f1ede4] p-1" role="tablist" aria-label="Sign-in method">
+                {[
+                  { id: "password", label: "Password", Icon: KeyRound },
+                  { id: "code", label: "One-time code", Icon: MailCheck },
+                ].map(({ id, label, Icon }) => (
+                  <button
+                    key={id}
+                    type="button"
+                    role="tab"
+                    aria-selected={method === id}
+                    onClick={() => {
+                      setMethod(id);
+                      setError("");
+                    }}
+                    className={`inline-flex items-center justify-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold transition ${method === id ? "bg-white text-[#142536] shadow-sm" : "text-[#5e6872] hover:text-[#142536]"}`}
+                  >
+                    <Icon size={16} aria-hidden="true" /> {label}
+                  </button>
+                ))}
+              </div>
+            )}
+            {method === "code" && !challenge && (
+              <p className="mt-4 text-sm leading-6 text-[#5e6872]">Choose where to receive your one-time code.</p>
+            )}
+
+            {method === "code" && error && (
               <div role="alert" className="mt-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm leading-6 text-red-800">
                 {error}
               </div>
             )}
 
-            {challenge ? (
+            {method === "password" && !challenge ? (
+              <PasswordSignIn onSignedIn={finish} onUseCode={() => setMethod("code")} />
+            ) : challenge ? (
               <CodeStep
                 challenge={challenge}
                 onVerified={finish}
@@ -251,11 +281,11 @@ export default function VideoAdminAuth() {
 
             <div className="mt-7 border-t border-[#e7e2d8] pt-6">
               <Link
-                to="/videos"
-                className="inline-flex items-center gap-2 text-sm font-medium text-[#68737e] transition hover:text-[#142536]"
+                to="/"
+                className="inline-flex items-center gap-2 text-sm font-medium text-[#5e6872] transition hover:text-[#142536]"
               >
                 <ArrowLeft size={15} aria-hidden="true" />
-                Back to videos
+                Back to website
               </Link>
             </div>
           </div>

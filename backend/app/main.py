@@ -34,6 +34,7 @@ from .routers.admin import public_router as settings_router
 from .routers.admin import router as admin_router
 from .routers.analytics import router as analytics_router
 from .routers.auth import router as auth_router
+from .routers.password_auth import router as password_auth_router
 from .routers.chat import router as chat_router
 from .routers.properties import admin_router as properties_admin_router
 from .routers.properties import public_router as properties_router
@@ -145,6 +146,7 @@ def health():
 
 
 app.include_router(auth_router)
+app.include_router(password_auth_router)
 app.include_router(users_router)
 app.include_router(videos_router)
 app.include_router(reactions_router)

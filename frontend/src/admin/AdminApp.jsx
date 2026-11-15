@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useState } from "react";
 import { Link, Navigate, NavLink, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import {
+  KeyRound,
   BarChart3,
   Bell,
   Building2,
@@ -35,6 +36,7 @@ const Reports = lazy(() => import("./pages/Reports"));
 const Seo = lazy(() => import("./pages/Seo"));
 const Team = lazy(() => import("./pages/Team"));
 const SettingsPage = lazy(() => import("./pages/SettingsPage"));
+const Account = lazy(() => import("./pages/Account"));
 
 const MANAGERS = ["owner", "admin"];
 const MODULES = [
@@ -49,6 +51,7 @@ const MODULES = [
   { to: "/admin/seo", label: "SEO", Icon: Globe, roles: MANAGERS },
   { to: "/admin/team", label: "Users & team", Icon: UserCog, roles: MANAGERS },
   { to: "/admin/settings", label: "Settings", Icon: Settings, roles: MANAGERS },
+  { to: "/admin/account", label: "My account", Icon: KeyRound },
 ];
 
 export default function AdminApp() {
@@ -152,6 +155,7 @@ function AdminShell({ role, user }) {
               {MANAGERS.includes(role) && <Route path="seo" element={<Seo />} />}
               {MANAGERS.includes(role) && <Route path="team" element={<Team role={role} />} />}
               {MANAGERS.includes(role) && <Route path="settings" element={<SettingsPage />} />}
+              <Route path="account" element={<Account />} />
               <Route path="*" element={<Navigate to="/admin" replace />} />
             </Routes>
           </Suspense>

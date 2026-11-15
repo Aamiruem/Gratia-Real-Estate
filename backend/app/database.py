@@ -52,6 +52,7 @@ def create_tables():
         Notification,
         OwnerRecoveryChallenge,
         OwnerSetupState,
+        PasswordResetChallenge,
         User,
         Video,
         VideoReaction,

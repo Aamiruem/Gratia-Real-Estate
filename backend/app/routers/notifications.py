@@ -25,7 +25,7 @@ from .. import notifications
 from ..database import SessionLocal, get_db
 from ..dependencies import ACCESS_COOKIE
 from ..models import Notification, User
-from ..security import decode_token
+from ..security import decode_claims, token_is_current
 from ..permissions import require_any_staff, require_manager, staff_role
 
 router = APIRouter(prefix="/notifications", tags=["Notifications"])
@@ -242,12 +242,12 @@ def _owner_from_cookie(request: Request) -> bool:
     if not token:
         return False
     try:
-        user_id = decode_token(token, "access")
+        claims = decode_claims(token, "access")
     except (JWTError, ValueError, TypeError):
         return False
     with SessionLocal() as db:
-        user = db.get(User, user_id)
-        return bool(user and user.is_active and staff_role(user))
+        user = db.get(User, int(claims["sub"]))
+        return bool(user and user.is_active and token_is_current(claims, user) and staff_role(user))
 
 
 def _latest_for(audiences: tuple[str, ...]) -> int:

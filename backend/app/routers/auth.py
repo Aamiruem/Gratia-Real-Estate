@@ -25,8 +25,9 @@ from ..security import (
     REFRESH_TOKEN_EXPIRE_DAYS,
     create_access_token,
     create_refresh_token,
-    decode_token,
+    decode_claims,
     hash_password,
+    token_is_current,
 )
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
@@ -53,7 +54,13 @@ def is_video_admin(user: User) -> bool:
     )
 
 
-def set_auth_cookies(response: Response, access_token: str, refresh_token: str, request: Request | None = None):
+def set_auth_cookies(
+    response: Response,
+    access_token: str,
+    refresh_token: str,
+    request: Request | None = None,
+    remember: bool = True,
+):
     response.set_cookie(
         key=ACCESS_COOKIE,
         value=access_token,
@@ -69,8 +76,21 @@ def set_auth_cookies(response: Response, access_token: str, refresh_token: str, 
         httponly=True,
         secure=COOKIE_SECURE,
         samesite=COOKIE_SAMESITE,
-        max_age=60 * 60 * 24 * REFRESH_TOKEN_EXPIRE_DAYS,
+        # Not remembered: a browser-session cookie, gone when the browser closes.
+        max_age=60 * 60 * 24 * REFRESH_TOKEN_EXPIRE_DAYS if remember else None,
         path=refresh_cookie_path(request),
+    )
+
+
+def issue_session(user: User, response: Response, request: Request | None, remember: bool = True) -> None:
+    """Sets fresh access + refresh cookies carrying the user's current token version."""
+    version = user.token_version or 0
+    set_auth_cookies(
+        response,
+        create_access_token(user.id, version),
+        create_refresh_token(user.id, version, remember),
+        request,
+        remember,
     )
 
 
@@ -169,7 +189,7 @@ def _enforce_cooldown(user: User, db: Session) -> None:
 
 
 def _complete_login(user: User, response: Response, request: Request) -> AuthResponse:
-    set_auth_cookies(response, create_access_token(user.id), create_refresh_token(user.id), request)
+    issue_session(user, response, request)
     return AuthResponse(message="Login successful", user=user, is_video_admin=is_video_admin(user))
 
 
@@ -459,17 +479,19 @@ def refresh(response: Response, request: Request, db: Session = Depends(get_db))
         raise HTTPException(status_code=401, detail="Refresh session not found")
 
     try:
-        user_id = decode_token(token, "refresh")
+        claims = decode_claims(token, "refresh")
     except (JWTError, ValueError, TypeError):
         raise HTTPException(status_code=401, detail="Invalid or expired refresh session")
 
-    user = db.get(User, user_id)
+    user = db.get(User, int(claims["sub"]))
     if not user or not user.is_active:
         raise HTTPException(status_code=401, detail="User account is not active")
+    if not token_is_current(claims, user):
+        clear_auth_cookies(response)
+        raise HTTPException(status_code=401, detail="This session was signed out. Please sign in again.")
 
-    access_token = create_access_token(user.id)
-    new_refresh_token = create_refresh_token(user.id)
-    set_auth_cookies(response, access_token, new_refresh_token, request)
+    # Rotate: every refresh issues a new refresh token, keeping "remember me".
+    issue_session(user, response, request, remember=bool(claims.get("rem", True)))
 
     return AuthResponse(
         message="Session refreshed",

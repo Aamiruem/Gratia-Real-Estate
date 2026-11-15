@@ -26,6 +26,30 @@ class User(Base):
         onupdate=lambda: datetime.now(timezone.utc),
         nullable=False,
     )
+    # Password sign-in (in addition to one-time codes). Accounts created for
+    # OTP-only sign-in have a random hash and password_set_at = NULL.
+    password_set_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    failed_logins: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Included in every session token; incrementing it signs out all sessions.
+    token_version: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+
+
+class PasswordResetChallenge(Base):
+    """A pending "forgot password" code (only its hash is stored)."""
+
+    __tablename__ = "password_reset_challenges"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    user_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    code_hash: Mapped[str] = mapped_column(String(128), nullable=False)
+    attempts: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    sent_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
 
 
 class Video(Base):

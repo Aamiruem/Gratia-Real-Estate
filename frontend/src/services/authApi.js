@@ -51,4 +51,29 @@ export const authApi = {
   },
 
   logout: () => apiRequest("/auth/logout", { method: "POST" }),
+
+  // Email + password sign-in (staff), alongside one-time codes.
+  passwordLogin: (email, password, remember = true) =>
+    apiRequest("/auth/password/login", {
+      method: "POST",
+      body: JSON.stringify({ email, password, remember }),
+    }),
+  passwordStatus: () => apiRequest("/auth/password/status"),
+  setPassword: (newPassword, currentPassword, signOutOtherDevices = true) =>
+    apiRequest("/auth/password/set", {
+      method: "POST",
+      body: JSON.stringify({
+        new_password: newPassword,
+        current_password: currentPassword || null,
+        sign_out_other_devices: signOutOtherDevices,
+      }),
+    }),
+  forgotPassword: (email) =>
+    apiRequest("/auth/password/forgot", { method: "POST", body: JSON.stringify({ email }) }),
+  resetPassword: (challengeId, code, newPassword) =>
+    apiRequest("/auth/password/reset", {
+      method: "POST",
+      body: JSON.stringify({ challenge_id: challengeId, code, new_password: newPassword }),
+    }),
+  logoutAll: () => apiRequest("/auth/logout-all", { method: "POST" }),
 };

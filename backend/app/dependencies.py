@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from .database import get_db
 from .models import User
-from .security import decode_token
+from .security import decode_claims, token_is_current
 
 
 ACCESS_COOKIE = "access_token"
@@ -20,18 +20,23 @@ def get_current_user(request: Request, db: Session = Depends(get_db)) -> User:
         )
 
     try:
-        user_id = decode_token(token, "access")
+        claims = decode_claims(token, "access")
     except (JWTError, ValueError, TypeError):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired session",
         )
 
-    user = db.get(User, user_id)
+    user = db.get(User, int(claims["sub"]))
     if not user or not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="User account is not active",
+        )
+    if not token_is_current(claims, user):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="This session was signed out. Please sign in again.",
         )
 
     return user
