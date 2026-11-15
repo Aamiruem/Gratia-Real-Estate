@@ -7,7 +7,7 @@ Delivery channels (configure in backend/.env, see .env.example):
 
 Local development (COOKIE_SECURE=false) without a provider: the code is
 printed in the backend terminal and shown on the sign-in page for requests
-from this computer, so sign-in always works while developing.
+from this computer. ntfy is not used as a substitute for email or SMS OTP.
 """
 
 import hashlib
@@ -58,7 +58,7 @@ def owner_phone() -> str:
 
 
 def email_otp_available() -> bool:
-    return email_delivery.configured() or push_configured() or console_fallback_enabled()
+    return email_delivery.configured() or console_fallback_enabled()
 
 
 def whatsapp_otp_available() -> bool:
@@ -68,7 +68,7 @@ def whatsapp_otp_available() -> bool:
 
 def phone_otp_available() -> bool:
     return bool(owner_phone()) and (
-        sms_delivery.configured() or push_configured() or console_fallback_enabled()
+        sms_delivery.configured() or console_fallback_enabled()
     )
 
 
@@ -132,10 +132,9 @@ def send_whatsapp_code(phone: str, code: str) -> str:
 
 def _deliver_without_provider(recipient: str, code: str, purpose: str) -> str:
     if console_fallback_enabled():
-        return _log_code(recipient, code, purpose)
-    if send_push_code(code, purpose):
-        return "push"
-    raise DeliveryError("No verification delivery (email, SMS or ntfy) is configured.")
+        _log_code(recipient, code, purpose)
+        return "log"
+    raise DeliveryError("A real email or SMS provider is not configured.")
 
 
 def send_push_code(code: str, purpose: str) -> bool:
@@ -160,7 +159,6 @@ def send_push_code(code: str, purpose: str) -> bool:
 
 
 def _log_code(recipient: str, code: str, purpose: str) -> str:
-    pushed = send_push_code(code, purpose)
     try:
         code_file = config.LOCAL_CONFIG_DIR / "latest_otp.txt"
         code_file.parent.mkdir(parents=True, exist_ok=True)
@@ -171,4 +169,4 @@ def _log_code(recipient: str, code: str, purpose: str) -> str:
         f"\n*** [DEV] Gratia owner {purpose} code for {recipient}: {code} (valid {CODE_TTL_MINUTES} min) ***\n",
         flush=True,
     )
-    return "push" if pushed else "log"
+    return "log"

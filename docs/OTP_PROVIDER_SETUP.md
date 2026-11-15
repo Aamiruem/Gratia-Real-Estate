@@ -2,8 +2,9 @@
 
 The website already sends sign-in and password-reset codes. Each channel only
 needs a provider account and its keys. Until a channel is set up, local
-development shows codes in the backend window (and your ntfy app); production
-never does.
+development shows codes in the backend window. Production requires a real
+provider for each selected channel; ntfy is only used for owner alerts and is
+not treated as email, SMS, or WhatsApp OTP delivery.
 
 Keys are entered with the setup script (`python -m app.configure_otp`, run in
 `backend`) or added to the private settings file
@@ -67,7 +68,11 @@ need your own DLT registration to start.
 4. In `backend`, run `python -m app.configure_otp`, choose SMS → **1) Fast2SMS**,
    enter the owner's mobile number and paste the key (input is hidden).
    Answer **Y** to "Send a test SMS", and the phone should get a real SMS.
-5. Restart the backend. **SMS OTP** codes now arrive as normal SMS; ntfy is no longer used for them.
+5. Restart the backend. **SMS OTP** codes now arrive as normal SMS; ntfy is not used as an SMS substitute.
+
+If the sign-in page says **SMS provider is not configured**, an ntfy notification
+does not count as SMS. Configure one of the providers above on the backend host;
+the option will only become available after the provider credentials are loaded.
 
 ### Option B: MSG91 with your own DLT registration (best for scale and branding)
 1. Register the business as a **Principal Entity** on a DLT portal (e.g. Jio

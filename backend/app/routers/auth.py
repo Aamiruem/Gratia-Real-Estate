@@ -261,25 +261,23 @@ def _owner_exists() -> bool:
 @router.get("/otp/options")
 def otp_options():
     configured_phone = otp.owner_phone()
-    local_hint = (
-        "Code sent to your phone (ntfy app)" if otp.push_configured()
-        else "Local mode · code shown in backend terminal"
-    )
+    local_hint = "Local test mode · code shown on this computer; no external message is sent"
     return {
         "owner_configured": bool(VIDEO_ADMIN_EMAIL) or _owner_exists(),
         "email": otp.email_otp_available(),
         "email_hint": (
-            None if otp.smtp_configured()
-            else local_hint if otp.email_otp_available()
-            else "Email delivery is not configured"
+            None if otp.smtp_configured() else local_hint if otp.console_fallback_enabled()
+            else "Email provider is not configured"
         ),
         "whatsapp": otp.whatsapp_otp_available(),
         "whatsapp_hint": None if otp.whatsapp_otp_available() else "WhatsApp delivery is not set up yet",
         "phone": otp.phone_otp_available(),
         "phone_hint": (
-            None if otp.twilio_configured() or not otp.phone_otp_available()
-            else local_hint
-        ) if configured_phone else "Owner mobile number is not configured",
+            None if otp.twilio_configured()
+            else "Owner mobile number is not configured" if not configured_phone
+            else local_hint if otp.console_fallback_enabled()
+            else "SMS provider is not configured"
+        ),
     }
 
 

@@ -227,6 +227,14 @@ export default function VideoAdminAuth() {
                   })}
                 </fieldset>
 
+                {otpOptionsLoaded && !otpOptions.email && !otpOptions.phone && !otpOptions.whatsapp && (
+                  <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-950">
+                    No email, SMS, or WhatsApp OTP provider is configured. Configure email or SMS on the backend with{" "}
+                    <code className="rounded bg-amber-100 px-1">python -m app.configure_otp</code>, then restart the backend.
+                    WhatsApp requires an approved Meta authentication template and API credentials.
+                  </div>
+                )}
+
                 {otpOptionsError && (
                   <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900">
                     <p>{otpOptionsError}</p>

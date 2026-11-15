@@ -3,7 +3,7 @@
 import pytest
 
 from app import configure_otp, otp
-from app.delivery import sms
+from app.delivery import DeliveryError, email, sms
 
 
 def answers(monkeypatch, inputs, secrets=()):
@@ -60,3 +60,24 @@ def test_configured_sms_is_used_instead_of_ntfy(monkeypatch):
     assert otp.send_sms_code("98765 43210", "123456") == "sms"
     assert sent == [("+919876543210", "123456")]
     assert pushed == []
+
+
+def test_ntfy_is_not_reported_or_used_as_normal_email_or_sms_otp(client, monkeypatch):
+    monkeypatch.setattr(email, "configured", lambda: False)
+    monkeypatch.setattr(sms, "configured", lambda: False)
+    monkeypatch.setattr(otp, "console_fallback_enabled", lambda: False)
+    monkeypatch.setattr(otp, "push_configured", lambda: True)
+    pushed = []
+    monkeypatch.setattr(otp, "send_push_code", lambda *args: pushed.append(args) or True)
+
+    options = client.get("/auth/otp/options").json()
+    assert options["email"] is False
+    assert options["phone"] is False
+    assert options["email_hint"] == "Email provider is not configured"
+    assert options["phone_hint"] == "SMS provider is not configured"
+    with pytest.raises(DeliveryError, match="real email or SMS provider"):
+        otp.send_sms_code("+919876543210", "123456")
+    assert pushed == []
+
+    response = client.post("/auth/login", json={"otp_channel": "phone", "phone": "+91 98765 43210"})
+    assert response.status_code == 503
