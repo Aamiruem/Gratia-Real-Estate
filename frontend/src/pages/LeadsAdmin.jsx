@@ -27,9 +27,9 @@ import { projects } from "../data/projects";
 import { timeAgo } from "../utils/format";
 
 const TABS = [
+  { id: "", label: "All", Icon: UserRoundPlus },
   { id: "enquiries", label: "Enquiries & leads", Icon: Inbox },
   { id: "appointments", label: "Property visits", Icon: CalendarCheck },
-  { id: "", label: "All", Icon: UserRoundPlus },
 ];
 
 const KIND_LABELS = {
@@ -96,7 +96,7 @@ export default function LeadsAdmin({ embedded = false }) {
 function Dashboard({ embedded = false }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const focusRef = searchParams.get("lead") || "";
-  const [tab, setTab] = useState(focusRef ? "" : "enquiries");
+  const [tab, setTab] = useState("");
   const [status, setStatus] = useState("");
   const [query, setQuery] = useState(focusRef);
   const [upcoming, setUpcoming] = useState(false);

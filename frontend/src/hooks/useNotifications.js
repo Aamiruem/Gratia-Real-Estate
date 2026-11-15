@@ -164,11 +164,19 @@ async function refresh() {
     return refreshing;
   }
   refreshing = (async () => {
+    const requestedMode = state.mode;
     try {
       const [feed, mineFeed] = await Promise.all([
-        state.mode === "owner" ? notificationsApi.ownerFeed() : notificationsApi.publicFeed(),
+        requestedMode === "owner" ? notificationsApi.ownerFeed() : notificationsApi.publicFeed(),
         notificationsApi.mine().catch(() => null),
       ]);
+      // The mode changed while loading (e.g. the owner session was recognised):
+      // drop this result so it can't mark the other feed's items as "new". The
+      // queued refresh loads the right feed.
+      if (state.mode !== requestedMode) {
+        refreshQueued = true;
+        return;
+      }
       if (mineFeed) {
         const knownMine = new Set(state.mine.map((item) => item.id));
         if (state.mine.length || latestSeen !== null) {
