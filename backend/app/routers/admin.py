@@ -162,6 +162,117 @@ def reports(
     }
 
 
+# ---------------- CRM dashboard ----------------
+
+
+@router.get("/crm/summary")
+def crm_summary(
+    period: Literal["today", "week", "month", "quarter", "year", "custom"] = "month",
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    db: Session = Depends(get_db),
+    _staff: User = Depends(require_any_staff),
+):
+    today = date.today()
+    if period == "custom":
+        if start_date is None or end_date is None or start_date > end_date:
+            raise HTTPException(status_code=422, detail="Choose a valid custom date range.")
+        if (end_date - start_date).days > 730:
+            raise HTTPException(status_code=422, detail="Custom date ranges may not exceed 731 days.")
+        start = start_date
+        end = end_date
+    else:
+        days = {"today": 1, "week": 7, "month": 30, "quarter": 90, "year": 365}[period]
+        start = today - timedelta(days=days - 1)
+        end = today
+
+    start_at = datetime.combine(start, datetime.min.time(), tzinfo=timezone.utc)
+    end_at = datetime.combine(end + timedelta(days=1), datetime.min.time(), tzinfo=timezone.utc)
+    in_range = (Lead.created_at >= start_at, Lead.created_at < end_at)
+    rows = db.scalars(select(Lead).where(*in_range).order_by(Lead.created_at.asc())).all()
+    counts = Counter(lead.status for lead in rows)
+    customers = len({lead.phone for lead in rows})
+    total = len(rows)
+    won = counts.get("converted", 0) + counts.get("completed", 0)
+    now = datetime.now(timezone.utc)
+
+    follow_ups_due = db.scalar(
+        select(func.count()).select_from(Lead).where(
+            Lead.follow_up_at.is_not(None),
+            Lead.follow_up_at <= now,
+            Lead.status.not_in(("converted", "closed", "lost", "not_interested", "cancelled")),
+        )
+    ) or 0
+    upcoming_visits = db.scalar(
+        select(func.count()).select_from(Lead).where(
+            Lead.kind.in_(APPOINTMENT_KINDS),
+            Lead.visit_date >= today,
+            Lead.status.in_(("requested", "confirmed", "rescheduled")),
+        )
+    ) or 0
+    all_customers = db.scalar(select(func.count(distinct(Lead.phone)))) or 0
+
+    def grouped(key_name):
+        counts_by_key = Counter((getattr(lead, key_name) or "Not specified") for lead in rows)
+        return [
+            {"label": str(label), "value": value}
+            for label, value in counts_by_key.most_common(8)
+        ]
+
+    daily = Counter(lead.created_at.date().isoformat() for lead in rows)
+    trend = [
+        {"date": (start + timedelta(days=offset)).isoformat(),
+         "value": daily.get((start + timedelta(days=offset)).isoformat(), 0)}
+        for offset in range((end - start).days + 1)
+    ]
+
+    agent_counts: dict[int, Counter] = {}
+    for lead in rows:
+        if lead.assigned_to_id is not None:
+            agent_counts.setdefault(lead.assigned_to_id, Counter())["leads"] += 1
+            if lead.status in ("converted", "completed"):
+                agent_counts[lead.assigned_to_id]["converted"] += 1
+    agent_ids = list(agent_counts)
+    agents = {
+        user.id: user.name
+        for user in db.scalars(select(User).where(User.id.in_(agent_ids))).all()
+    } if agent_ids else {}
+
+    return {
+        "period": period,
+        "start_date": start.isoformat(),
+        "end_date": end.isoformat(),
+        "customers": all_customers,
+        "customers_in_period": customers,
+        "leads": {
+            "total": total,
+            "new": counts.get("new", 0) + counts.get("requested", 0),
+            "active": sum(value for status, value in counts.items() if status not in ("converted", "completed", "closed", "lost", "not_interested", "cancelled", "no_show")),
+            "contacted": counts.get("contacted", 0) + counts.get("confirmed", 0),
+            "qualified": counts.get("qualified", 0) + counts.get("interested", 0),
+            "negotiations": counts.get("negotiation", 0),
+            "converted": won,
+            "lost": counts.get("lost", 0) + counts.get("not_interested", 0),
+            "conversion_rate": round(100 * won / total, 1) if total else 0,
+        },
+        "follow_ups_due": follow_ups_due,
+        "upcoming_visits": upcoming_visits,
+        "by_status": [{"label": key, "value": value} for key, value in counts.most_common()],
+        "by_source": grouped("source"),
+        "property_demand": grouped("property_name"),
+        "trend": trend,
+        "agent_performance": [
+            {
+                "label": agents.get(agent_id, f"Agent {agent_id}"),
+                "value": stats["leads"],
+                "converted": stats["converted"],
+            }
+            for agent_id, stats in sorted(agent_counts.items(), key=lambda item: (-item[1]["leads"], item[0]))
+        ],
+        "revenue_tracking": "Deal and payment records are not configured.",
+    }
+
+
 # ---------------- team members ----------------
 
 

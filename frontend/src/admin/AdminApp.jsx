@@ -37,10 +37,14 @@ const Seo = lazy(() => import("./pages/Seo"));
 const Team = lazy(() => import("./pages/Team"));
 const SettingsPage = lazy(() => import("./pages/SettingsPage"));
 const Account = lazy(() => import("./pages/Account"));
+const CrmDashboard = lazy(() => import("./pages/CrmDashboard"));
+const LeadPipeline = lazy(() => import("./pages/LeadPipeline"));
 
 const MANAGERS = ["owner", "admin"];
 const MODULES = [
   { to: "/admin", label: "Overview", Icon: LayoutDashboard, end: true },
+  { to: "/admin/crm", label: "CRM dashboard", Icon: BarChart3 },
+  { to: "/admin/pipeline", label: "Lead pipeline", Icon: Inbox },
   { to: "/admin/properties", label: "Properties", Icon: Building2 },
   { to: "/admin/customers", label: "Customers", Icon: Users },
   { to: "/admin/leads", label: "Leads", Icon: Inbox },
@@ -145,6 +149,8 @@ function AdminShell({ role, user }) {
           <Suspense fallback={<Loader2 className="mx-auto mt-16 animate-spin text-[#c9a45c]" size={28} aria-label="Loading" />}>
             <Routes>
               <Route index element={<Overview role={role} />} />
+              <Route path="crm" element={<CrmDashboard />} />
+              <Route path="pipeline" element={<LeadPipeline />} />
               <Route path="properties" element={<Properties role={role} />} />
               <Route path="customers" element={<Customers />} />
               <Route path="leads" element={<Leads embedded />} />

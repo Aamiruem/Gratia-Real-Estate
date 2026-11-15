@@ -5,7 +5,7 @@ import pytest
 
 from app import ratelimit
 from app.database import SessionLocal
-from app.models import AnalyticsEvent, FollowUp, Lead, Notification, Property, SiteSetting, User
+from app.models import AnalyticsEvent, AuditLog, FollowUp, Lead, Notification, Property, SiteSetting, User
 
 
 @pytest.fixture(autouse=True)
@@ -167,6 +167,47 @@ def test_overview_customers_reports_settings(client, outbox):
     saved = client.put("/admin/settings", json={"social": {"instagram": "https://instagram.com/gratia"}, "business_hours": "Mon–Sat"})
     assert saved.status_code == 200
     assert client.get("/settings/public").json()["social"]["instagram"] == "https://instagram.com/gratia"
+
+
+def test_crm_summary_uses_real_leads_and_pipeline_updates_are_audited(client, outbox):
+    lead = client.post(
+        "/leads",
+        json={
+            "kind": "property_enquiry",
+            "name": "Aarav Sharma",
+            "phone": "9876500081",
+            "property_name": "Test Towers",
+            "source": "referral",
+        },
+    ).json()
+    assert client.get("/admin/crm/summary").status_code == 401
+    sign_in(client, outbox)
+
+    summary = client.get("/admin/crm/summary?period=month")
+    assert summary.status_code == 200, summary.text
+    data = summary.json()
+    assert data["leads"]["total"] == 1
+    assert data["leads"]["new"] == 1
+    assert data["customers"] == 1
+    assert data["by_source"] == [{"label": "referral", "value": 1}]
+    assert data["property_demand"] == [{"label": "Test Towers", "value": 1}]
+
+    moved = client.patch(f"/leads/{lead['reference']}", json={"status": "booking"})
+    assert moved.status_code == 200, moved.text
+    persisted = client.get(f"/leads/{lead['reference']}").json()
+    assert persisted["status"] == "booking"
+    with SessionLocal() as db:
+        assert db.query(AuditLog).filter_by(
+            target_type="lead",
+            target_id=lead["reference"],
+            action="updated",
+        ).count() == 1
+
+    updated_summary = client.get("/admin/crm/summary?period=month").json()
+    assert {"label": "booking", "value": 1} in updated_summary["by_status"]
+    assert client.get(
+        "/admin/crm/summary?period=custom&start_date=2026-11-02&end_date=2026-11-01"
+    ).status_code == 422
 
 
 def test_chat_and_push_degrade_gracefully_without_keys(client):

@@ -34,8 +34,9 @@ APPOINTMENT_KINDS = {"visit", "consultation"}
 # Sales pipeline for enquiries. "qualified" and "lost" are earlier names still
 # found on older records; they stay valid so nothing stored needs rewriting.
 LEAD_STATUSES = (
-    "new", "contacted", "interested", "site_visit_scheduled", "negotiation",
-    "converted", "not_interested", "closed",
+    "new", "contacted", "qualified", "interested", "site_visit_scheduled",
+    "site_visit_completed", "negotiation", "booking", "converted",
+    "not_interested", "closed",
 )
 LEGACY_LEAD_STATUSES = ("qualified", "lost")
 VISIT_STATUSES = ("requested", "confirmed", "rescheduled", "completed", "cancelled", "no_show")

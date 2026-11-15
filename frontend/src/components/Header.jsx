@@ -142,21 +142,19 @@ export default function Header() {
             </nav>
 
             <div className="flex items-center gap-1.5 sm:gap-2">
-              {isStaff && (
-                <Link
-                  to="/admin"
-                  title="Open the admin panel"
-                  className="hidden h-11 items-center gap-2 whitespace-nowrap rounded-full border border-[#c9a45c] bg-[#fbf6ea] px-3 text-[13px] font-bold text-[#142536] transition hover:bg-[#c9a45c] sm:inline-flex min-[1440px]:px-4"
-                >
-                  <LayoutDashboard size={16} aria-hidden="true" />
-                  <span className="sr-only min-[1440px]:not-sr-only">Admin</span>
-                  {role && (
-                    <span className="hidden rounded-full bg-[#142536] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-[#e1c98f] min-[1800px]:inline">
-                      {role}
-                    </span>
-                  )}
-                </Link>
-              )}
+              <Link
+                to="/admin"
+                title={isStaff ? "Open the admin panel" : "Admin sign in"}
+                className="hidden h-11 items-center gap-2 whitespace-nowrap rounded-full border border-[#c9a45c] bg-[#fbf6ea] px-3 text-[13px] font-bold text-[#142536] transition hover:bg-[#c9a45c] sm:inline-flex min-[1440px]:px-4"
+              >
+                <LayoutDashboard size={16} aria-hidden="true" />
+                <span>Admin</span>
+                {role && (
+                  <span className="hidden rounded-full bg-[#142536] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-[#e1c98f] min-[1800px]:inline">
+                    {role}
+                  </span>
+                )}
+              </Link>
               <SiteSearch variant="full" />
               <InstallAppButton variant="header" />
               <NotificationBell />
@@ -198,23 +196,21 @@ export default function Header() {
           className={`overflow-hidden border-b border-[#e7e2d8] bg-white transition-all duration-300 xl:hidden ${open ? "max-h-[1100px] opacity-100" : "pointer-events-none max-h-0 opacity-0"}`}
         >
           <nav className="container-luxury py-4" aria-label="Mobile navigation">
-            {isStaff && (
-              <Link
-                to="/admin"
-                className="mb-3 flex items-center justify-between gap-3 rounded-2xl bg-[#142536] p-3 text-white"
-              >
-                <span className="flex items-center gap-3">
-                  <span className="grid size-10 place-items-center rounded-xl bg-[#c9a45c] text-[#142536]">
-                    <LayoutDashboard size={18} aria-hidden="true" />
-                  </span>
-                  <span>
-                    <span className="block text-sm font-bold">Open admin panel</span>
-                    <span className="block text-xs capitalize text-white/70">Signed in as {role}</span>
-                  </span>
+            <Link
+              to="/admin"
+              className="mb-3 flex items-center justify-between gap-3 rounded-2xl bg-[#142536] p-3 text-white"
+            >
+              <span className="flex items-center gap-3">
+                <span className="grid size-10 place-items-center rounded-xl bg-[#c9a45c] text-[#142536]">
+                  <LayoutDashboard size={18} aria-hidden="true" />
                 </span>
-                <ChevronRight size={16} className="text-[#e1c98f]" aria-hidden="true" />
-              </Link>
-            )}
+                <span>
+                  <span className="block text-sm font-bold">{isStaff ? "Open admin panel" : "Admin sign in"}</span>
+                  <span className="block text-xs capitalize text-white/70">{isStaff ? `Signed in as ${role}` : "Staff access only"}</span>
+                </span>
+              </span>
+              <ChevronRight size={16} className="text-[#e1c98f]" aria-hidden="true" />
+            </Link>
             <ul className="grid gap-2 sm:grid-cols-2">
               {[...nav.slice(0, 3), ...propertyPages, ...nav.slice(3)].map(({ label, to, icon: Icon, tone }) => (
                 <li key={to}>

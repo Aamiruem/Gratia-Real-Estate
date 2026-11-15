@@ -6,6 +6,12 @@ export const adminApi = {
   overview: () => apiRequest("/admin/overview"),
   analytics: (days = 30) => apiRequest(`/admin/analytics?days=${days}`),
   reports: (days = 90) => apiRequest(`/admin/reports?days=${days}`),
+  crmSummary: (params = {}) => {
+    const query = new URLSearchParams(
+      Object.entries(params).filter(([, value]) => value !== "" && value !== undefined),
+    ).toString();
+    return apiRequest(`/admin/crm/summary${query ? `?${query}` : ""}`);
+  },
   customers: (q = "") => apiRequest(`/admin/customers${q ? `?q=${encodeURIComponent(q)}` : ""}`),
   followUpsDue: (scope = "all") => apiRequest(`/leads/follow-ups/due?scope=${scope}`),
   leadFollowUps: (reference) => apiRequest(`/leads/${encodeURIComponent(reference)}/follow-ups`),

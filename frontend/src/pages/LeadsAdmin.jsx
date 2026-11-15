@@ -41,7 +41,20 @@ const KIND_LABELS = {
   whatsapp: "WhatsApp enquiry",
 };
 
-const LEAD_STATUSES = ["new", "contacted", "qualified", "converted", "lost"];
+const LEAD_STATUSES = [
+  "new",
+  "contacted",
+  "qualified",
+  "interested",
+  "site_visit_scheduled",
+  "site_visit_completed",
+  "negotiation",
+  "booking",
+  "converted",
+  "not_interested",
+  "closed",
+  "lost",
+];
 const VISIT_STATUSES = ["requested", "confirmed", "rescheduled", "completed", "cancelled", "no_show"];
 const APPOINTMENT_KINDS = new Set(["visit", "consultation"]);
 
@@ -49,17 +62,24 @@ const STATUS_TONES = {
   new: "bg-sky-100 text-sky-800",
   requested: "bg-sky-100 text-sky-800",
   contacted: "bg-amber-100 text-amber-900",
+  interested: "bg-violet-100 text-violet-800",
+  site_visit_scheduled: "bg-sky-100 text-sky-800",
+  site_visit_completed: "bg-emerald-100 text-emerald-800",
+  negotiation: "bg-amber-100 text-amber-900",
+  booking: "bg-indigo-100 text-indigo-800",
   confirmed: "bg-emerald-100 text-emerald-800",
   rescheduled: "bg-amber-100 text-amber-900",
   qualified: "bg-violet-100 text-violet-800",
   converted: "bg-emerald-100 text-emerald-800",
+  not_interested: "bg-slate-200 text-slate-700",
+  closed: "bg-slate-200 text-slate-700",
   completed: "bg-emerald-100 text-emerald-800",
   lost: "bg-slate-200 text-slate-700",
   cancelled: "bg-slate-200 text-slate-700",
   no_show: "bg-rose-100 text-rose-800",
 };
 
-const label = (value) => value.replace("_", " ").replace(/^\w/, (c) => c.toUpperCase());
+const label = (value) => value.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase());
 const formatDay = (iso) =>
   iso ? new Intl.DateTimeFormat("en-IN", { weekday: "short", day: "numeric", month: "short", year: "numeric" }).format(new Date(`${iso}T00:00:00`)) : "";
 const whatsappLink = (phone, name) =>
