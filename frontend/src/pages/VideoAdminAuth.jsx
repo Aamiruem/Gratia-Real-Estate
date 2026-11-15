@@ -385,7 +385,9 @@ function CodeStep({ challenge, onVerified, onResent, onBack }) {
       ? "your phone (ntfy app notification)"
       : challenge.deliveredVia === "log"
         ? "this computer (local test mode)"
-        : challenge.sentTo;
+        : challenge.deliveredVia === "sms"
+          ? `an SMS to ${challenge.sentTo}`
+          : challenge.sentTo;
 
   return (
     <form
