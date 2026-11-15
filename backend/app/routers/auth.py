@@ -19,6 +19,7 @@ from ..models import (
     LoginChallenge,
     User,
 )
+from ..permissions import staff_role
 from ..schemas import AuthResponse, LoginRequest, UserResponse
 from ..security import (
     ACCESS_TOKEN_EXPIRE_MINUTES,
@@ -305,8 +306,8 @@ def start_email_change(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    if not is_video_admin(current_user):
-        raise HTTPException(status_code=403, detail="Only the video owner can change this email.")
+    if staff_role(current_user) is None:
+        raise HTTPException(status_code=403, detail="Only staff accounts can change their sign-in email.")
 
     new_email = data.email.lower().strip()
     if new_email == current_user.email.lower():
@@ -368,11 +369,13 @@ def start_email_change(
 @router.post("/email/change/verify", response_model=AuthResponse)
 def verify_email_change(
     data: EmailChangeVerifyRequest,
+    request: Request,
+    response: Response,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    if not is_video_admin(current_user):
-        raise HTTPException(status_code=403, detail="Only the video owner can change this email.")
+    if staff_role(current_user) is None:
+        raise HTTPException(status_code=403, detail="Only staff accounts can change their sign-in email.")
 
     challenge = db.get(EmailChangeChallenge, data.challenge_id)
     if challenge is None or challenge.user_id != current_user.id:
@@ -408,7 +411,7 @@ def verify_email_change(
         raise HTTPException(status_code=409, detail="An account already uses that email address.")
 
     current_user.email = challenge.new_email
-    current_user.role = "video_admin"
+    current_user.token_version = (current_user.token_version or 0) + 1
     db.delete(challenge)
     try:
         db.commit()
@@ -416,8 +419,9 @@ def verify_email_change(
         db.rollback()
         raise HTTPException(status_code=409, detail="An account already uses that email address.")
     db.refresh(current_user)
+    issue_session(current_user, response, request)
     return AuthResponse(
-        message="Owner email updated",
+        message="Sign-in email updated",
         user=current_user,
         is_video_admin=is_video_admin(current_user),
     )

@@ -48,9 +48,9 @@ export default function OwnerEmailChange({ currentEmail, onChanged, onCancel }) 
       <div className="flex items-start gap-3">
         <ShieldCheck size={18} className="mt-0.5 shrink-0 text-[#e1c98f]" aria-hidden="true" />
         <div>
-          <p className="text-sm font-semibold text-white">Change owner email</p>
+          <p className="text-sm font-semibold text-white">Change sign-in email</p>
           <p className="mt-1 text-xs leading-5 text-white/65">
-            Current owner: {currentEmail}. Verify the new address with a one-time code.
+            Current address: {currentEmail}. Verify the new address with a one-time code.
           </p>
         </div>
       </div>

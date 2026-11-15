@@ -42,7 +42,11 @@ export default function Team({ role }) {
 
   return (
     <div className="space-y-6">
-      <PageTitle eyebrow="Access" title="Users & team" text="Team members sign in at the private sign-in page with a one-time code sent to their email. No passwords to share." />
+      <PageTitle
+        eyebrow="Access"
+        title="Users & team"
+        text="Create a staff account with its work email. The new member verifies that email with a sign-in code, then sets their own password in My account—no shared passwords."
+      />
       <ErrorNote error={error} />
       <div className="grid gap-6 xl:grid-cols-[1fr_360px]">
         <Card title="Team members">
@@ -84,7 +88,7 @@ export default function Team({ role }) {
             </ul>
           )}
         </Card>
-        <Card title="Add a team member">
+        <Card title="Create a staff account">
           <form onSubmit={add} className="space-y-3">
             <label className="block">
               <span className="mb-1 block text-xs font-bold text-[#142536]">Full name</span>

@@ -11,6 +11,44 @@ Keys are entered with the setup script (`python -m app.configure_otp`, run in
 `%LOCALAPPDATA%\GratiaEstates\backend.env` (on a server: the server's
 environment). **Never paste keys into chat, code or `.env.example`.**
 
+## Render environment variables
+
+For a Render deployment, add these in **Dashboard → your backend Web Service →
+Environment**. Use **Add Environment Variable** for each item; never put the
+values in the frontend or commit them to the repository.
+
+```text
+COOKIE_SECURE=true
+OTP_CONSOLE_FALLBACK=false
+OWNER_PHONE_NUMBER=+91<owner-mobile>
+
+EMAIL_PROVIDER=resend
+RESEND_API_KEY=<Resend API key>
+EMAIL_FROM=Gratia Estates <no-reply@your-verified-domain>
+
+SMS_PROVIDER=fast2sms
+FAST2SMS_API_KEY=<Fast2SMS API key>
+
+WHATSAPP_PHONE_NUMBER_ID=<Meta phone number ID>
+WHATSAPP_ACCESS_TOKEN=<Meta system-user access token>
+WHATSAPP_OTP_TEMPLATE=<approved authentication template name>
+WHATSAPP_TEMPLATE_LANG=<exact approved template language, e.g. en_US>
+WHATSAPP_TEMPLATE_BUTTON=true
+```
+
+Replace every placeholder in the Render dashboard with a real value. The
+Resend sender domain must be verified; Fast2SMS must have completed its
+account setup and have SMS balance; WhatsApp needs a valid Meta system-user
+token and an approved Authentication template. The template name and language
+must match Meta exactly. Set `WHATSAPP_TEMPLATE_BUTTON=false` only if the
+approved template has no OTP button.
+
+After saving the variables, redeploy or restart the Render service, then
+reload the admin sign-in page. Email, SMS and WhatsApp should each become
+selectable only when their provider configuration is present. Use the
+provider's logs/dashboard to confirm actual delivery; an API acceptance is
+not the same as a handset delivery receipt.
+
 | Channel | Recommended provider | Typical time to go live | Code status |
 |---|---|---|---|
 | Email | Amazon SES (via SMTP) | 1–2 days (production access review) | Ready (SMTP adapter) |

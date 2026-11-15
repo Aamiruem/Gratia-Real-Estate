@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { KeyRound, Loader2, LogOut, ShieldCheck, UserRound } from "lucide-react";
+import { KeyRound, Loader2, LogOut, Mail, ShieldCheck, UserRound } from "lucide-react";
 import useOwner, { notifyAuthChanged } from "../../hooks/useOwner";
 import { authApi } from "../../services/authApi";
 import { toast } from "../../components/Toaster";
 import { PasswordField, StrengthList, passwordChecks } from "../../components/auth/PasswordSignIn";
+import OwnerEmailChange from "../../components/OwnerEmailChange";
 
 const dateTime = (value) =>
   value ? new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" }).format(new Date(value)) : "";
@@ -21,6 +22,7 @@ export default function Account() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [loggingOut, setLoggingOut] = useState(false);
+  const [editingEmail, setEditingEmail] = useState(false);
 
   useEffect(() => {
     authApi.passwordStatus().then(setStatus, (err) => setError(err.message));
@@ -28,6 +30,11 @@ export default function Account() {
 
   const hasPassword = status?.password_set;
   const email = user?.email || "";
+  const emailChanged = () => {
+    setEditingEmail(false);
+    notifyAuthChanged();
+    toast("Sign-in email changed. Other sessions were signed out.");
+  };
 
   const save = async (event) => {
     event.preventDefault();
@@ -80,6 +87,30 @@ export default function Account() {
           </div>
           {role && <span className="ml-auto rounded-full bg-[#f3ead8] px-3 py-1 text-xs font-bold capitalize text-[#80602b]">{role}</span>}
         </div>
+      </section>
+
+      <section className="mt-5 rounded-2xl border border-[#e7e2d8] bg-[#142536] p-5 text-white shadow-sm sm:p-6">
+        <h2 className="flex items-center gap-2 font-display text-lg font-bold">
+          <Mail size={18} className="text-[#e1c98f]" aria-hidden="true" /> Sign-in email
+        </h2>
+        <p className="mt-1 text-sm text-white/70">
+          Verify the new address with a code. Your other sessions will be signed out.
+        </p>
+        {editingEmail ? (
+          <OwnerEmailChange
+            currentEmail={email}
+            onChanged={emailChanged}
+            onCancel={() => setEditingEmail(false)}
+          />
+        ) : (
+          <button
+            type="button"
+            onClick={() => setEditingEmail(true)}
+            className="mt-4 inline-flex items-center gap-2 rounded-full bg-[#c9a45c] px-5 py-2.5 text-sm font-bold text-[#142536] transition hover:bg-[#e1c98f]"
+          >
+            <Mail size={15} aria-hidden="true" /> Change email
+          </button>
+        )}
       </section>
 
       <section className="mt-5 rounded-2xl border border-[#e7e2d8] bg-white p-5 shadow-sm sm:p-6">

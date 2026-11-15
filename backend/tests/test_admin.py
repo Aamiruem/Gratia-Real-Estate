@@ -111,6 +111,54 @@ def test_team_members_roles_and_assignment(client, outbox):
     assert client.post("/auth/login", json={"otp_channel": "email", "email": "asha@example.com"}).status_code in (401, 403)
 
 
+def test_staff_can_verify_email_change_and_set_password_without_role_escalation(client, outbox):
+    sign_in(client, outbox)
+    added = client.post(
+        "/admin/team",
+        json={"name": "Asha Agent", "email": "asha@example.com", "role": "agent"},
+    )
+    assert added.status_code == 201, added.text
+
+    client.cookies.clear()
+    challenge = client.post("/auth/login", json={"otp_channel": "email", "email": "asha@example.com"})
+    assert challenge.status_code == 200, challenge.text
+    verified = client.post(
+        "/auth/login/verify",
+        json={"challenge_id": challenge.json()["challenge_id"], "code": outbox[-1][2]},
+    )
+    assert verified.status_code == 200 and verified.json()["role"] == "agent"
+    previous_session = dict(client.cookies)
+
+    started = client.post("/auth/email/change/start", json={"email": "asha.new@example.com"})
+    assert started.status_code == 200, started.text
+    assert outbox[-1][1] == "asha.new@example.com"
+    changed = client.post(
+        "/auth/email/change/verify",
+        json={"challenge_id": started.json()["challenge_id"], "code": outbox[-1][2]},
+    )
+    assert changed.status_code == 200, changed.text
+    assert changed.json()["user"]["email"] == "asha.new@example.com"
+    assert changed.json()["role"] == "agent"
+
+    client.cookies.clear()
+    client.cookies.update(previous_session)
+    assert client.get("/auth/me").status_code == 401
+
+    client.cookies.clear()
+    assert client.post("/auth/login", json={"otp_channel": "email", "email": "asha@example.com"}).status_code == 401
+    client.cookies.clear()
+    new_login = client.post("/auth/login", json={"otp_channel": "email", "email": "asha.new@example.com"})
+    assert new_login.status_code == 200, new_login.text
+    verified_new_login = client.post(
+        "/auth/login/verify",
+        json={"challenge_id": new_login.json()["challenge_id"], "code": outbox[-1][2]},
+    )
+    assert verified_new_login.status_code == 200 and verified_new_login.json()["role"] == "agent"
+    assert client.post(
+        "/auth/password/set", json={"new_password": "Agent-Homes-2026!"}
+    ).status_code == 200
+
+
 def test_unknown_email_still_rejected(client, outbox):
     assert client.post("/auth/login", json={"otp_channel": "email", "email": "nobody@example.com"}).status_code == 401
 
