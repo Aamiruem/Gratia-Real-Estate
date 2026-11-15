@@ -4,6 +4,8 @@ import Header from "./Header";
 import Footer from "./Footer";
 import WhatsAppButton from "./WhatsAppButton";
 import ChatWidget from "./chat/ChatWidget";
+import LeadDialogHost from "./LeadDialog";
+import Toaster from "./Toaster";
 
 export default function Layout({ children }) {
   const { pathname } = useLocation();
@@ -24,6 +26,8 @@ export default function Layout({ children }) {
       <Footer />
       <WhatsAppButton />
       <ChatWidget />
+      <LeadDialogHost />
+      <Toaster />
     </>
   );
 }

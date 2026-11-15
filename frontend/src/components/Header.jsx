@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
 import {
+  Bell,
   BookOpen,
   Building2,
   CalendarCheck,
@@ -19,6 +20,9 @@ import CallIcon from "./CallIcon";
 import { projects } from "../data/projects";
 import Logo from "./Logo";
 import SiteSearch from "./SiteSearch";
+import NotificationBell from "./notifications/NotificationBell";
+import ShareButton from "./ShareButton";
+import InstallAppButton from "./InstallAppButton";
 
 // Each item has its own icon colour so the menu is easy to scan.
 const nav = [
@@ -115,8 +119,16 @@ export default function Header() {
             })}
           </nav>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2">
             <SiteSearch className="h-11 justify-center px-3 lg:px-4" />
+            <InstallAppButton variant="header" />
+            <div className="hidden sm:block">
+              <ShareButton
+                title="Gratia Estates | Premium Real Estate Advisory in Gurgaon"
+                text="Explore Gurgaon residential projects with Gratia Estates."
+              />
+            </div>
+            <NotificationBell />
             <a
               href={TEL}
               className="hidden items-center gap-2.5 rounded-full py-1.5 pl-1.5 pr-4 transition hover:bg-[#f7f4ed] 2xl:inline-flex"
@@ -155,7 +167,7 @@ export default function Header() {
       {/* Mobile menu */}
       <div
         id="mobile-navigation"
-        className={`overflow-hidden border-b border-[#e7e2d8] bg-white transition-all duration-300 xl:hidden ${open ? "max-h-[720px] opacity-100" : "pointer-events-none max-h-0 opacity-0"}`}
+        className={`overflow-hidden border-b border-[#e7e2d8] bg-white transition-all duration-300 xl:hidden ${open ? "max-h-[960px] opacity-100" : "pointer-events-none max-h-0 opacity-0"}`}
       >
         <nav className="container-luxury py-4" aria-label="Mobile navigation">
           <ul className="grid gap-2 sm:grid-cols-2">
@@ -218,6 +230,21 @@ export default function Header() {
               className="col-span-2 flex items-center justify-center gap-2 rounded-full bg-[#c9a45c] px-4 py-3 text-sm font-bold text-[#142536]"
             >
               <CalendarCheck size={16} aria-hidden="true" /> Book a site visit
+            </Link>
+            <InstallAppButton variant="menu" />
+            <ShareButton
+              variant="menu"
+              align="right"
+              title="Gratia Estates | Premium Real Estate Advisory in Gurgaon"
+              text="Explore Gurgaon residential projects with Gratia Estates."
+              url={typeof window !== "undefined" ? window.location.origin : undefined}
+              label="Share website"
+            />
+            <Link
+              to="/notifications"
+              className="col-span-2 flex items-center justify-center gap-2 rounded-full border border-[#e7e2d8] bg-white px-4 py-3 text-sm font-semibold text-[#142536]"
+            >
+              <Bell size={16} aria-hidden="true" /> Notifications
             </Link>
           </div>
           <p className="mt-4 text-center text-xs text-[#7a828c]">
