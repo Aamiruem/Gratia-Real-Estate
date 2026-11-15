@@ -158,7 +158,7 @@ def _issue_challenge(
     }
     # Local test mode only: no real email/SMS was sent and the request comes from
     # this computer, so showing the code is no weaker than the local code file.
-    if show_code and delivered_via in {"log", "push"}:
+    if show_code and delivered_via == "log":
         reply["local_code"] = code
     return reply
 

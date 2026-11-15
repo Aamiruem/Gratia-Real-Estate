@@ -3,19 +3,15 @@
 Delivery channels (configure in backend/.env, see .env.example):
   * Email  -> app/delivery/email.py  (SMTP or Resend)
   * Mobile -> app/delivery/sms.py    (Twilio, MSG91 or Fast2SMS)
-  * ntfy push notification as an optional backup (NTFY_TOPIC)
 
 Local development (COOKIE_SECURE=false) without a provider: the code is
 printed in the backend terminal and shown on the sign-in page for requests
-from this computer. ntfy is not used as a substitute for email or SMS OTP.
+from this computer. Push notifications are not used for OTP delivery.
 """
 
 import hashlib
 import hmac
-import logging
 import secrets
-from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
 
 from . import config
 from .delivery import DeliveryError
@@ -23,8 +19,6 @@ from .delivery import email as email_delivery
 from .delivery import sms as sms_delivery
 from .delivery import whatsapp as whatsapp_delivery
 from .security import JWT_SECRET_KEY
-
-logger = logging.getLogger("gratia.otp")
 
 CODE_TTL_MINUTES = 10
 MAX_ATTEMPTS = 5
@@ -42,10 +36,6 @@ def smtp_configured() -> bool:
 def twilio_configured() -> bool:
     """True when a real SMS provider is configured (name kept for compatibility)."""
     return sms_delivery.configured()
-
-
-def push_configured() -> bool:
-    return bool(config.env("NTFY_TOPIC"))
 
 
 def console_fallback_enabled() -> bool:
@@ -135,27 +125,6 @@ def _deliver_without_provider(recipient: str, code: str, purpose: str) -> str:
         _log_code(recipient, code, purpose)
         return "log"
     raise DeliveryError("A real email or SMS provider is not configured.")
-
-
-def send_push_code(code: str, purpose: str) -> bool:
-    """Sends the code as a phone notification through ntfy (https://ntfy.sh).
-    The topic name is a long random secret; the owner subscribes in the ntfy app."""
-    topic = config.env("NTFY_TOPIC")
-    if not topic:
-        return False
-    server = config.env("NTFY_SERVER", "https://ntfy.sh").rstrip("/")
-    request = Request(
-        f"{server}/{topic}",
-        data=f"{code} is your Gratia Estates {purpose} code. It expires in {CODE_TTL_MINUTES} minutes.".encode(),
-        headers={"Title": f"Gratia Estates {purpose} code", "Priority": "high", "Tags": "lock"},
-        method="POST",
-    )
-    try:
-        with urlopen(request, timeout=10) as response:
-            return response.status < 300
-    except (HTTPError, URLError):
-        logger.exception("Could not send the owner code notification")
-        return False
 
 
 def _log_code(recipient: str, code: str, purpose: str) -> str:

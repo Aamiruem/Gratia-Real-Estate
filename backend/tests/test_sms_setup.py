@@ -48,27 +48,21 @@ def test_fast2sms_refuses_non_indian_numbers(monkeypatch):
         configure_otp._configure_sms({})
 
 
-def test_configured_sms_is_used_instead_of_ntfy(monkeypatch):
-    """With a provider set, mobile codes go by SMS only, never to the ntfy app."""
+def test_configured_sms_sends_only_through_the_sms_provider(monkeypatch):
     monkeypatch.setenv("SMS_PROVIDER", "fast2sms")
     monkeypatch.setenv("FAST2SMS_API_KEY", "key-123")
     monkeypatch.setenv("NTFY_TOPIC", "some-topic")
-    sent, pushed = [], []
+    sent = []
     monkeypatch.setattr(sms, "_fast2sms", lambda e164, code: sent.append((e164, code)))
-    monkeypatch.setattr(otp, "send_push_code", lambda code, purpose: pushed.append(code) or True)
 
     assert otp.send_sms_code("98765 43210", "123456") == "sms"
     assert sent == [("+919876543210", "123456")]
-    assert pushed == []
 
 
 def test_ntfy_is_not_reported_or_used_as_normal_email_or_sms_otp(client, monkeypatch):
     monkeypatch.setattr(email, "configured", lambda: False)
     monkeypatch.setattr(sms, "configured", lambda: False)
     monkeypatch.setattr(otp, "console_fallback_enabled", lambda: False)
-    monkeypatch.setattr(otp, "push_configured", lambda: True)
-    pushed = []
-    monkeypatch.setattr(otp, "send_push_code", lambda *args: pushed.append(args) or True)
 
     options = client.get("/auth/otp/options").json()
     assert options["email"] is False
@@ -77,7 +71,6 @@ def test_ntfy_is_not_reported_or_used_as_normal_email_or_sms_otp(client, monkeyp
     assert options["phone_hint"] == "SMS provider is not configured"
     with pytest.raises(DeliveryError, match="real email or SMS provider"):
         otp.send_sms_code("+919876543210", "123456")
-    assert pushed == []
 
     response = client.post("/auth/login", json={"otp_channel": "phone", "phone": "+91 98765 43210"})
     assert response.status_code == 503

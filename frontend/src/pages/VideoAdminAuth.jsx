@@ -401,14 +401,12 @@ function CodeStep({ challenge, onVerified, onResent, onBack }) {
   const expired = remaining === 0;
 
   const destination =
-    challenge.deliveredVia === "push"
-      ? "your phone (ntfy app notification)"
-      : challenge.deliveredVia === "log"
-        ? "this computer (local test mode)"
-        : challenge.deliveredVia === "sms"
-          ? `an SMS to ${challenge.sentTo}`
-          : challenge.deliveredVia === "whatsapp"
-            ? `WhatsApp on ${challenge.sentTo}`
+    challenge.deliveredVia === "log"
+      ? "this computer (local test mode)"
+      : challenge.deliveredVia === "sms"
+        ? `an SMS to ${challenge.sentTo}`
+        : challenge.deliveredVia === "whatsapp"
+          ? `WhatsApp on ${challenge.sentTo}`
           : challenge.sentTo;
 
   return (
@@ -512,15 +510,10 @@ function CodeStep({ challenge, onVerified, onResent, onBack }) {
         <details className="mt-6 rounded-xl border border-[#e7e2d8] px-4 py-3 text-sm text-[#5e6872]">
           <summary className="cursor-pointer font-semibold text-[#263746]">Didn&apos;t get the code?</summary>
           <ul className="mt-2 list-disc space-y-1 pl-5 leading-6">
-            {challenge.deliveredVia === "push" ? (
+            {challenge.channel === "phone" || challenge.channel === "whatsapp" ? (
               <>
-                <li>Open the ntfy app and check you are subscribed to your private Gratia channel.</li>
-                <li>Allow notifications for ntfy in your phone settings.</li>
-              </>
-            ) : challenge.channel === "phone" ? (
-              <>
-                <li>SMS can take up to a minute; check that the phone has signal.</li>
-                <li>If DND is on, codes from some senders may be delayed. Try Email OTP instead.</li>
+                <li>Check that your phone has signal and can receive messages on the selected channel.</li>
+                <li>If delivery is delayed, try another configured option such as Email OTP.</li>
               </>
             ) : (
               <li>Check your spam, junk or Promotions folder.</li>
