@@ -22,25 +22,35 @@ services:
         generateValue: true
       - key: COOKIE_SECURE
         value: "true"
+      - key: OTP_CONSOLE_FALLBACK
+        value: "false"
       - key: VIDEO_ADMIN_EMAIL
         sync: false
       - key: OWNER_PHONE_NUMBER
         sync: false
       # Email OTP: Render blocks SMTP on free instances, so Resend is easiest.
+      - key: EMAIL_PROVIDER
+        value: resend
       - key: RESEND_API_KEY
         sync: false
       - key: EMAIL_FROM
         sync: false
-      # Mobile OTP via Twilio. Enter the SID, token and number in the Render
-      # dashboard; never commit them (this repository is public).
+      # Mobile OTP via Fast2SMS (India).
       - key: SMS_PROVIDER
-        value: twilio
-      - key: TWILIO_ACCOUNT_SID
+        value: fast2sms
+      - key: FAST2SMS_API_KEY
         sync: false
-      - key: TWILIO_AUTH_TOKEN
+      # WhatsApp OTP via Meta's approved authentication template.
+      - key: WHATSAPP_PHONE_NUMBER_ID
         sync: false
-      - key: TWILIO_FROM_NUMBER
+      - key: WHATSAPP_ACCESS_TOKEN
         sync: false
+      - key: WHATSAPP_OTP_TEMPLATE
+        sync: false
+      - key: WHATSAPP_TEMPLATE_LANG
+        value: en
+      - key: WHATSAPP_TEMPLATE_BUTTON
+        value: "true"
       # Public site address (links in owner alerts) and CORS for direct calls.
       - key: PUBLIC_SITE_URL
         value: https://www.gratiaestates.com

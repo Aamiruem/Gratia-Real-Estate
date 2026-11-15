@@ -54,13 +54,18 @@ copied into the `properties` table the first time.
 |---|---|
 | `VIDEO_ADMIN_EMAIL` | the owner's email (owner sign-in) |
 | `OWNER_PHONE_NUMBER` | owner mobile, `+91...` |
-| `RESEND_API_KEY`, `EMAIL_FROM` | email sign-in codes (Render blocks SMTP on free plans) |
+| `EMAIL_PROVIDER` | `resend` |
+| `RESEND_API_KEY`, `EMAIL_FROM` | email OTP delivery; `EMAIL_FROM` must use a verified sender domain |
+| `SMS_PROVIDER` | `fast2sms` |
+| `FAST2SMS_API_KEY` | SMS OTP delivery for Indian mobile numbers |
+| `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_ACCESS_TOKEN` | Meta WhatsApp Business API credentials |
+| `WHATSAPP_OTP_TEMPLATE`, `WHATSAPP_TEMPLATE_LANG` | approved authentication template name and exact language |
 | `NTFY_TOPIC` | optional: phone alert for every new lead (ntfy app) |
 | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | optional: browser push. Generate with `cd backend && python -m app.push` |
 | `OPENAI_API_KEY` | optional: AI chat assistant (OpenAI API key, billed per use) |
 | `VERCEL_DEPLOY_HOOK_URL` | optional: rebuilds the sitemap when listings change (see step 3.5) |
 
-`COOKIE_SECURE=true`, JWT secrets, `PUBLIC_SITE_URL` and `FRONTEND_ORIGINS` are set by the blueprint.
+`COOKIE_SECURE=true`, `OTP_CONSOLE_FALLBACK=false`, JWT secrets, `PUBLIC_SITE_URL` and `FRONTEND_ORIGINS` are set by the blueprint. Save the environment changes and redeploy the backend.
 
 4. Deploy, then open `https://<your-api>.onrender.com/health` → `{"status":"ok","database":"ok"}`.
 
