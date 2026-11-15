@@ -1,0 +1,47 @@
+# Render blueprint for the API + PostgreSQL (Render → New → Blueprint → this repo).
+# After it deploys, copy the API URL into Vercel as BACKEND_URL.
+# Secrets marked sync: false are entered in the Render dashboard.
+services:
+  - type: web
+    name: gratia-api
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT --proxy-headers --forwarded-allow-ips="*"
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.8"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: gratia-db
+          property: connectionString
+      - key: JWT_SECRET_KEY
+        generateValue: true
+      - key: JWT_REFRESH_SECRET_KEY
+        generateValue: true
+      - key: COOKIE_SECURE
+        value: "true"
+      - key: VIDEO_ADMIN_EMAIL
+        sync: false
+      - key: OWNER_PHONE_NUMBER
+        sync: false
+      # Email OTP: Render blocks SMTP on free instances, so Resend is easiest.
+      - key: RESEND_API_KEY
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
+      # Mobile OTP via Twilio. Enter the SID, token and number in the Render
+      # dashboard; never commit them (this repository is public).
+      - key: SMS_PROVIDER
+        value: twilio
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: TWILIO_FROM_NUMBER
+        sync: false
+
+databases:
+  - name: gratia-db
+    plan: free
