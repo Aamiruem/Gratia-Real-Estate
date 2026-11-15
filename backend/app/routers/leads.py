@@ -17,7 +17,7 @@ from typing import Literal, Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, Response, status
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
-from sqlalchemy import func, or_, select
+from sqlalchemy import delete, func, or_, select
 from sqlalchemy.orm import Session
 
 from .. import audit, notifications, ratelimit
@@ -414,19 +414,84 @@ def create_lead(
     return LeadCreated(reference=lead.reference, kind=lead.kind, status=lead.status, created_at=lead.created_at)
 
 
-def _filtered(kind: Optional[str], status_: Optional[str], q: Optional[str], upcoming: bool):
+class LeadFilters(BaseModel):
+    kind: Optional[str] = None
+    status: Optional[str] = None
+    q: Optional[str] = None
+    upcoming: bool = False
+    date_from: Optional[date] = None
+    date_to: Optional[date] = None
+    location: Optional[str] = None
+    property: Optional[str] = None
+    budget: Optional[str] = None
+    source: Optional[str] = None
+    requirement: Optional[str] = None
+    assigned: Optional[str] = None  # member id, "me" or "unassigned"
+
+
+def lead_filters(
+    kind: Optional[str] = Query(default=None, max_length=30),
+    status_: Optional[str] = Query(default=None, alias="status", max_length=30),
+    q: Optional[str] = Query(default=None, max_length=100),
+    upcoming: bool = False,
+    date_from: Optional[date] = None,
+    date_to: Optional[date] = None,
+    location: Optional[str] = Query(default=None, max_length=150),
+    property_: Optional[str] = Query(default=None, alias="property", max_length=150),
+    budget: Optional[str] = Query(default=None, max_length=60),
+    source: Optional[str] = Query(default=None, max_length=60),
+    requirement: Optional[str] = Query(default=None, max_length=20),
+    assigned: Optional[str] = Query(default=None, max_length=20),
+) -> LeadFilters:
+    return LeadFilters(
+        kind=kind, status=status_, q=q, upcoming=upcoming, date_from=date_from, date_to=date_to,
+        location=location, property=property_, budget=budget, source=source, requirement=requirement,
+        assigned=assigned,
+    )
+
+
+def _contains(column, text: str):
+    return func.lower(func.coalesce(column, "")).like(f"%{text.strip().lower()}%")
+
+
+def _filtered(filters: LeadFilters, staff: Optional[User] = None):
     query = select(Lead)
+    kind = filters.kind
     if kind == "appointments":
         query = query.where(Lead.kind.in_(APPOINTMENT_KINDS))
     elif kind == "enquiries":
         query = query.where(Lead.kind.not_in(APPOINTMENT_KINDS))
     elif kind:
         query = query.where(Lead.kind == kind)
-    if status_:
-        query = query.where(Lead.status == status_)
-    if upcoming:
+    if filters.status:
+        query = query.where(Lead.status == filters.status)
+    if filters.upcoming:
         query = query.where(Lead.visit_date >= date.today())
-    if q:
+    if filters.date_from:
+        query = query.where(Lead.created_at >= datetime.combine(filters.date_from, datetime.min.time(), tzinfo=timezone.utc))
+    if filters.date_to:
+        end = datetime.combine(filters.date_to, datetime.min.time(), tzinfo=timezone.utc) + timedelta(days=1)
+        query = query.where(Lead.created_at < end)
+    if filters.location:
+        query = query.where(_contains(Lead.location, filters.location))
+    if filters.property:
+        query = query.where(
+            or_(Lead.property_slug == filters.property.strip(), _contains(Lead.property_name, filters.property))
+        )
+    if filters.budget:
+        query = query.where(_contains(Lead.budget, filters.budget))
+    if filters.source:
+        query = query.where(Lead.source == filters.source)
+    if filters.requirement:
+        query = query.where(Lead.requirement == filters.requirement)
+    if filters.assigned == "unassigned":
+        query = query.where(Lead.assigned_to_id.is_(None))
+    elif filters.assigned == "me" and staff is not None:
+        query = query.where(Lead.assigned_to_id == staff.id)
+    elif filters.assigned and filters.assigned.isdigit():
+        query = query.where(Lead.assigned_to_id == int(filters.assigned))
+    if filters.q:
+        q = filters.q
         like = f"%{q.strip().lower()}%"
         matches = [
             func.lower(Lead.name).like(like),
@@ -434,28 +499,31 @@ def _filtered(kind: Optional[str], status_: Optional[str], q: Optional[str], upc
             func.lower(func.coalesce(Lead.email, "")).like(like),
             func.lower(func.coalesce(Lead.property_name, "")).like(like),
             func.lower(func.coalesce(Lead.location, "")).like(like),
+            func.lower(Lead.message).like(like),
         ]
         digits = re.sub(r"\D", "", q)
         if len(digits) >= 3:
             matches.append(Lead.phone.like(f"%{digits}%"))
+            matches.append(func.coalesce(Lead.whatsapp, "").like(f"%{digits}%"))
         query = query.where(or_(*matches))
     return query
 
 
 @router.get("", response_model=LeadList)
 def list_leads(
-    kind: Optional[str] = Query(default=None, max_length=30),
-    status_: Optional[str] = Query(default=None, alias="status", max_length=20),
-    q: Optional[str] = Query(default=None, max_length=100),
-    upcoming: bool = False,
+    filters: LeadFilters = Depends(lead_filters),
+    sort: str = Query(default="newest", max_length=20),
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
-    _staff: User = Depends(require_any_staff),
+    staff: User = Depends(require_any_staff),
 ):
-    query = _filtered(kind, status_, q, upcoming)
+    query = _filtered(filters, staff)
     total = db.scalar(select(func.count()).select_from(query.subquery())) or 0
-    order = (Lead.visit_date.asc(), Lead.created_at.desc()) if upcoming else (Lead.created_at.desc(),)
+    if filters.upcoming and sort == "newest":
+        order = (Lead.visit_date.asc(), Lead.created_at.desc())
+    else:
+        order = SORTS.get(sort, SORTS["newest"])
     items = db.scalars(query.order_by(*order).limit(limit).offset(offset)).all()
     return LeadList(items=items, total=total)
 
@@ -488,35 +556,76 @@ def lead_stats(db: Session = Depends(get_db), _staff: User = Depends(require_any
 
 
 EXPORT_FIELDS = (
-    "reference", "created_at", "kind", "status", "name", "phone", "email", "property_name", "property_slug",
-    "location", "budget", "property_type", "visit_date", "visit_time", "visitors", "contact_method",
-    "message", "owner_notes", "source_page", "requirement", "contact_time", "source", "follow_up_at",
+    "reference", "created_at", "updated_at", "kind", "status", "name", "phone", "whatsapp", "email",
+    "property_name", "property_slug", "location", "budget", "property_type", "requirement", "visit_date",
+    "visit_time", "visitors", "contact_method", "contact_time", "message", "owner_notes", "source",
+    "source_page", "assigned_to", "follow_up_at",
 )
+
+
+def _export_rows(filters: LeadFilters, staff: User, db: Session) -> list[list[str]]:
+    rows = db.scalars(_filtered(filters, staff).order_by(Lead.created_at.desc())).all()
+    names = {u.id: u.name for u in db.scalars(select(User)).all()}
+    table = []
+    for lead in rows:
+        values = []
+        for field in EXPORT_FIELDS:
+            value = names.get(lead.assigned_to_id, "") if field == "assigned_to" else getattr(lead, field)
+            value = "" if value is None else str(value)
+            # Stop spreadsheet apps from treating customer text as a formula.
+            values.append("'" + value if value[:1] in ("=", "+", "-", "@") and field not in ("phone", "whatsapp") else value)
+        table.append(values)
+    return table
+
+
+def _export_name(extension: str) -> str:
+    return f"gratia-leads-{datetime.now(timezone.utc).strftime('%Y%m%d')}.{extension}"
 
 
 @router.get("/export.csv")
 def export_leads(
-    kind: Optional[str] = Query(default=None, max_length=30),
+    filters: LeadFilters = Depends(lead_filters),
     db: Session = Depends(get_db),
-    _staff: User = Depends(require_any_staff),
+    staff: User = Depends(require_any_staff),
 ):
-    rows = db.scalars(_filtered(kind, None, None, False).order_by(Lead.created_at.desc())).all()
     buffer = io.StringIO()
     writer = csv.writer(buffer)
     writer.writerow(EXPORT_FIELDS)
-    for lead in rows:
-        values = []
-        for field in EXPORT_FIELDS:
-            value = getattr(lead, field)
-            value = "" if value is None else str(value)
-            # Stop spreadsheet apps from treating customer text as a formula.
-            values.append("'" + value if value[:1] in ("=", "+", "-", "@") and field not in ("phone",) else value)
-        writer.writerow(values)
-    stamp = datetime.now(timezone.utc).strftime("%Y%m%d")
+    writer.writerows(_export_rows(filters, staff, db))
     return Response(
         content=chr(0xFEFF) + buffer.getvalue(),  # BOM so Excel reads UTF-8 (₹, names)
         media_type="text/csv; charset=utf-8",
-        headers={"Content-Disposition": f'attachment; filename="gratia-leads-{stamp}.csv"'},
+        headers={"Content-Disposition": f'attachment; filename="{_export_name("csv")}"'},
+    )
+
+
+@router.get("/export.xlsx")
+def export_leads_excel(
+    filters: LeadFilters = Depends(lead_filters),
+    db: Session = Depends(get_db),
+    staff: User = Depends(require_any_staff),
+):
+    from openpyxl import Workbook
+    from openpyxl.styles import Font
+
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "Leads"
+    sheet.append([field.replace("_", " ").title() for field in EXPORT_FIELDS])
+    for cell in sheet[1]:
+        cell.font = Font(bold=True)
+    for row in _export_rows(filters, staff, db):
+        sheet.append(row)
+    sheet.freeze_panes = "A2"
+    for column in sheet.columns:
+        width = max(len(str(cell.value or "")) for cell in column[:200])
+        sheet.column_dimensions[column[0].column_letter].width = min(max(10, width + 2), 50)
+    buffer = io.BytesIO()
+    workbook.save(buffer)
+    return Response(
+        content=buffer.getvalue(),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{_export_name("xlsx")}"'},
     )
 
 
@@ -609,34 +718,94 @@ def update_lead(
     reference: str,
     payload: LeadUpdate,
     db: Session = Depends(get_db),
-    _staff: User = Depends(require_any_staff),
+    staff: User = Depends(require_any_staff),
 ):
     lead = _get(reference, db)
+    changes: list[str] = []
     if payload.assigned_to_id is not None:
         if payload.assigned_to_id == 0:
+            if lead.assigned_to_id is not None:
+                changes.append("assigned: nobody")
             lead.assigned_to_id = None
         else:
             member = db.get(User, payload.assigned_to_id)
             if member is None or staff_role(member) is None:
                 raise HTTPException(status_code=422, detail="Choose an active team member.")
+            if lead.assigned_to_id != member.id:
+                changes.append(f"assigned: {member.name}")
             lead.assigned_to_id = member.id
     if payload.clear_follow_up:
+        if lead.follow_up_at is not None:
+            changes.append("follow-up cleared")
         lead.follow_up_at = None
     elif payload.follow_up_at is not None:
         lead.follow_up_at = payload.follow_up_at
+        changes.append(f"follow-up: {payload.follow_up_at.strftime('%d %b %Y %H:%M')}")
     if payload.status is not None:
-        allowed = VISIT_STATUSES if lead.kind in APPOINTMENT_KINDS else LEAD_STATUSES
-        if payload.status not in allowed:
-            raise HTTPException(status_code=422, detail=f"Status must be one of: {', '.join(allowed)}")
+        if payload.status not in allowed_statuses(lead.kind):
+            raise HTTPException(status_code=422, detail=f"Status must be one of: {', '.join(allowed_statuses(lead.kind))}")
         if payload.status != lead.status:
             notify_customer(db, lead, payload.status)
+            changes.append(f"status: {lead.status} → {payload.status}")
         lead.status = payload.status
     if payload.owner_notes is not None:
-        lead.owner_notes = clean(payload.owner_notes, 5000) or ""
+        notes = clean(payload.owner_notes, 5000) or ""
+        if notes != lead.owner_notes:
+            changes.append("internal notes updated")
+        lead.owner_notes = notes
     if payload.visit_date is not None:
         lead.visit_date = payload.visit_date
+        changes.append(f"visit date: {payload.visit_date.isoformat()}")
     if payload.visit_time is not None:
         lead.visit_time = clean(payload.visit_time, 60)
+
+    # Customer / enquiry details ("Edit details").
+    edited = []
+    for field, limit in EDITABLE_TEXT.items():
+        value = getattr(payload, field)
+        if value is None:
+            continue
+        if field == "name":
+            value = clean(value, limit) or ""
+            if len(value) < 2:
+                raise HTTPException(status_code=422, detail="Name is required.")
+        elif field == "email":
+            value = clean(value, limit)
+            if value and not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]{2,}", value):
+                raise HTTPException(status_code=422, detail="Enter a valid email address.")
+            value = value.lower() if value else None
+        elif field == "message":
+            value = clean(value, limit) or ""
+        else:
+            value = clean(value, limit)
+        if getattr(lead, field) != value:
+            edited.append(field)
+            setattr(lead, field, value)
+    for field in ("phone", "whatsapp"):
+        raw = getattr(payload, field)
+        if raw is None:
+            continue
+        try:
+            value = normalize_phone(raw) if raw.strip() else None
+        except ValueError as error:
+            raise HTTPException(status_code=422, detail=str(error)) from error
+        if field == "phone" and value is None:
+            raise HTTPException(status_code=422, detail="Mobile number is required.")
+        if getattr(lead, field) != value:
+            edited.append(field)
+            setattr(lead, field, value)
+    if payload.requirement is not None:
+        value = payload.requirement or None
+        if value is not None and value not in ("buy", "sell", "rent", "invest"):
+            raise HTTPException(status_code=422, detail="Requirement must be buy, sell, rent or invest.")
+        if lead.requirement != value:
+            edited.append("requirement")
+            lead.requirement = value
+    if edited:
+        changes.append("edited: " + ", ".join(edited))
+
+    if changes:
+        audit.record(db, staff, "updated", "lead", lead.reference, "; ".join(changes))
     db.commit()
     db.refresh(lead)
     return lead
@@ -656,12 +825,13 @@ def add_follow_up(
     staff: User = Depends(require_any_staff),
 ):
     lead = _get(reference, db)
+    detail = "follow-up note added"
     if payload.status is not None:
-        allowed = VISIT_STATUSES if lead.kind in APPOINTMENT_KINDS else LEAD_STATUSES
-        if payload.status not in allowed:
-            raise HTTPException(status_code=422, detail=f"Status must be one of: {', '.join(allowed)}")
+        if payload.status not in allowed_statuses(lead.kind):
+            raise HTTPException(status_code=422, detail=f"Status must be one of: {', '.join(allowed_statuses(lead.kind))}")
         if payload.status != lead.status:
             notify_customer(db, lead, payload.status)
+            detail += f"; status: {lead.status} → {payload.status}"
         lead.status = payload.status
     entry = FollowUp(
         lead_id=lead.id,
@@ -671,7 +841,86 @@ def add_follow_up(
         next_action_at=payload.next_action_at,
     )
     lead.follow_up_at = payload.next_action_at
+    if payload.next_action_at:
+        detail += f"; next follow-up {payload.next_action_at.strftime('%d %b %Y %H:%M')}"
     db.add(entry)
+    audit.record(db, staff, "follow_up", "lead", lead.reference, detail)
     db.commit()
     db.refresh(entry)
     return entry
+
+
+@router.get("/{reference}/history", response_model=list[AuditEntry])
+def lead_history(reference: str, db: Session = Depends(get_db), _staff: User = Depends(require_any_staff)):
+    """Everything that happened to this lead, newest first."""
+    lead = _get(reference, db)
+    return db.scalars(
+        select(AuditLog)
+        .where(AuditLog.target_type == "lead", AuditLog.target_id == lead.reference)
+        .order_by(AuditLog.created_at.desc(), AuditLog.id.desc())
+    ).all()
+
+
+@router.post("/manual", response_model=LeadResponse, status_code=status.HTTP_201_CREATED)
+def create_lead_by_staff(
+    payload: LeadAdminCreate,
+    background: BackgroundTasks,
+    db: Session = Depends(get_db),
+    staff: User = Depends(require_any_staff),
+):
+    """A lead entered in the admin panel (phone call, walk-in, referral...)."""
+    status_value = payload.status or ("requested" if payload.kind in APPOINTMENT_KINDS else "new")
+    if status_value not in allowed_statuses(payload.kind):
+        raise HTTPException(status_code=422, detail=f"Status must be one of: {', '.join(allowed_statuses(payload.kind))}")
+    if payload.assigned_to_id is not None:
+        member = db.get(User, payload.assigned_to_id)
+        if member is None or staff_role(member) is None:
+            raise HTTPException(status_code=422, detail="Choose an active team member.")
+    duplicate = db.scalar(select(Lead.reference).where(Lead.phone == payload.phone).order_by(Lead.created_at.desc()))
+    lead = Lead(
+        reference=new_reference(db),
+        kind=payload.kind,
+        status=status_value,
+        name=payload.name,
+        phone=payload.phone,
+        whatsapp=payload.whatsapp,
+        email=str(payload.email).lower() if payload.email else None,
+        property_slug=clean(payload.property_slug, 150),
+        property_name=clean(payload.property_name, 150),
+        location=clean(payload.location, 150),
+        budget=clean(payload.budget, 60),
+        property_type=clean(payload.property_type, 80),
+        visit_date=payload.visit_date,
+        visit_time=clean(payload.visit_time, 60),
+        contact_method=clean(payload.contact_method, 20),
+        message=clean(payload.message, 2000) or "",
+        requirement=payload.requirement,
+        contact_time=clean(payload.contact_time, 60),
+        source=clean(payload.source, 60) or "manual",
+        source_page="admin panel",
+        owner_notes=clean(payload.owner_notes, 5000) or "",
+        assigned_to_id=payload.assigned_to_id,
+        follow_up_at=payload.follow_up_at,
+    )
+    db.add(lead)
+    db.flush()
+    note = f"Entered by {staff.name} in the admin panel."
+    if duplicate:
+        note += f" Same phone as earlier lead {duplicate}."
+    audit.record(db, staff, "created", "lead", lead.reference, note)
+    db.commit()
+    db.refresh(lead)
+    notifications.dispatch(background, [])
+    return lead
+
+
+@router.delete("/{reference}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_lead(reference: str, db: Session = Depends(get_db), manager: User = Depends(require_manager)):
+    """Permanently removes a lead and its follow-ups. Owners/admins only; the
+    audit log keeps who deleted it and a summary (not the customer's details)."""
+    lead = _get(reference, db)
+    db.execute(delete(FollowUp).where(FollowUp.lead_id == lead.id))
+    audit.record(db, manager, "deleted", "lead", lead.reference, f"Deleted {lead.kind} lead (status {lead.status}).")
+    db.delete(lead)
+    db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
