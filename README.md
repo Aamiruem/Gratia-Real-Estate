@@ -109,3 +109,34 @@ GitHub Actions runs both on every push (`.github/workflows/ci.yml`).
 Add a branch in `backend/app/delivery/email.py` or `sms.py` (`provider()`,
 `configured()`, `send()`), document its env keys in `backend/.env.example`,
 and add a test in `backend/tests/`. Nothing else needs to change.
+
+## Leads, notifications and the installable app
+
+**Leads.** Every website form (contact, site visit, callback, property enquiry,
+consultation, WhatsApp popup) is saved through `POST /api/leads` with a unique
+reference such as `GE-261115-7KQ2M`. Forms that continue to WhatsApp still open
+it immediately; the lead is saved in parallel. The backend validates every
+field, rejects invalid Indian mobile numbers, ignores bot-filled honeypot
+fields, returns the earlier reference for repeat submissions within 30
+minutes, and rate-limits each address and phone number.
+
+**Owner dashboard.** Sign in as the owner, then open `/admin/leads`: filter and
+search leads, track property visits (requested → confirmed → completed /
+cancelled / no-show), add private notes, export CSV, and announce a new
+property to all visitors.
+
+**Notifications.** The bell in the header shows real events only: the owner
+sees new enquiries, visit requests and callbacks; visitors see owner
+announcements, newly added videos and confirmations of their own enquiries.
+Updates arrive live (Server-Sent Events, with polling as a fallback). Browser
+alerts are shown only after someone clicks *Turn on alerts* and allows them.
+With `NTFY_TOPIC` set, each new lead also alerts the owner's phone.
+
+**Testimonials and social links.** Add genuine client testimonials to
+`frontend/src/data/testimonials.js` and profile URLs to `footerSocialLinks` in
+`frontend/src/components/footer/footerData.js`; both stay hidden until filled.
+
+**Installable app (PWA).** `public/manifest.webmanifest`, `public/sw.js` and
+`public/offline.html` make the site installable on Android, iPhone/iPad,
+Windows and macOS. The service worker is registered only in production builds
+(`npm run build` + `npm run preview`, or the deployed site), never in `npm run dev`.
