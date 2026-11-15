@@ -155,6 +155,7 @@ class Lead(Base):
     status: Mapped[str] = mapped_column(String(20), index=True, default="new", nullable=False)
     name: Mapped[str] = mapped_column(String(80), nullable=False)
     phone: Mapped[str] = mapped_column(String(20), index=True, nullable=False)
+    whatsapp: Mapped[str | None] = mapped_column(String(20), nullable=True)
     email: Mapped[str | None] = mapped_column(String(255), nullable=True)
     property_slug: Mapped[str | None] = mapped_column(String(150), nullable=True)
     property_name: Mapped[str | None] = mapped_column(String(150), nullable=True)
@@ -289,3 +290,19 @@ class PushSubscription(Base):
     audience: Mapped[str] = mapped_column(String(10), default="public", index=True, nullable=False)
     user_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, nullable=False)
+
+
+class AuditLog(Base):
+    """Who did what in the admin panel (lead edits, deletions, status changes...).
+    Never stores passwords, codes or tokens."""
+
+    __tablename__ = "audit_logs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    actor_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    actor_name: Mapped[str] = mapped_column(String(100), default="", nullable=False)
+    action: Mapped[str] = mapped_column(String(40), index=True, nullable=False)
+    target_type: Mapped[str] = mapped_column(String(30), index=True, nullable=False)
+    target_id: Mapped[str] = mapped_column(String(64), index=True, nullable=False)
+    detail: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, index=True, nullable=False)

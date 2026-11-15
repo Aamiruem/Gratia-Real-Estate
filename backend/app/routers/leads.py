@@ -20,9 +20,9 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
-from .. import notifications, ratelimit
+from .. import audit, notifications, ratelimit
 from ..database import get_db
-from ..models import FollowUp, Lead, Notification, User
+from ..models import AuditLog, FollowUp, Lead, Notification, User
 from ..permissions import require_any_staff, require_manager, staff_role
 
 router = APIRouter(prefix="/leads", tags=["Leads"])
@@ -31,8 +31,26 @@ LeadKind = Literal["contact", "visit", "callback", "property_enquiry", "consulta
 Requirement = Literal["buy", "sell", "rent", "invest"]
 SOURCES = {"organic", "direct", "social", "referral", "paid", "email", "whatsapp", "app"}
 APPOINTMENT_KINDS = {"visit", "consultation"}
-LEAD_STATUSES = ("new", "contacted", "qualified", "converted", "lost")
+# Sales pipeline for enquiries. "qualified" and "lost" are earlier names still
+# found on older records; they stay valid so nothing stored needs rewriting.
+LEAD_STATUSES = (
+    "new", "contacted", "interested", "site_visit_scheduled", "negotiation",
+    "converted", "not_interested", "closed",
+)
+LEGACY_LEAD_STATUSES = ("qualified", "lost")
 VISIT_STATUSES = ("requested", "confirmed", "rescheduled", "completed", "cancelled", "no_show")
+SORTS = {
+    "newest": (Lead.created_at.desc(),),
+    "oldest": (Lead.created_at.asc(),),
+    "name": (func.lower(Lead.name).asc(), Lead.created_at.desc()),
+    "status": (Lead.status.asc(), Lead.created_at.desc()),
+    "follow_up": (Lead.follow_up_at.is_(None), Lead.follow_up_at.asc(), Lead.created_at.desc()),
+    "updated": (Lead.updated_at.desc(),),
+}
+
+
+def allowed_statuses(lead_kind: str) -> tuple[str, ...]:
+    return VISIT_STATUSES if lead_kind in APPOINTMENT_KINDS else LEAD_STATUSES + LEGACY_LEAD_STATUSES
 
 KIND_TITLES = {
     "contact": "New customer enquiry received",
@@ -91,6 +109,7 @@ class LeadCreate(BaseModel):
     kind: LeadKind
     name: str = Field(min_length=2, max_length=80)
     phone: str = Field(min_length=10, max_length=20)
+    whatsapp: Optional[str] = Field(default=None, max_length=20)
     email: Optional[EmailStr] = None
     property_slug: Optional[str] = Field(default=None, max_length=150)
     property_name: Optional[str] = Field(default=None, max_length=150)
@@ -129,6 +148,13 @@ class LeadCreate(BaseModel):
     def valid_phone(cls, value: str) -> str:
         return normalize_phone(value)
 
+    @field_validator("whatsapp", mode="before")
+    @classmethod
+    def valid_whatsapp(cls, value):
+        if value is None or (isinstance(value, str) and not value.strip()):
+            return None
+        return normalize_phone(value)
+
 
 class LeadCreated(BaseModel):
     reference: str
@@ -146,6 +172,7 @@ class LeadResponse(BaseModel):
     status: str
     name: str
     phone: str
+    whatsapp: Optional[str] = None
     email: Optional[str]
     property_slug: Optional[str]
     property_name: Optional[str]
@@ -182,6 +209,47 @@ class LeadUpdate(BaseModel):
     assigned_to_id: Optional[int] = Field(default=None, ge=0)
     follow_up_at: Optional[datetime] = None
     clear_follow_up: bool = False
+    # Editable customer / enquiry details (staff "Edit details").
+    name: Optional[str] = Field(default=None, min_length=2, max_length=80)
+    phone: Optional[str] = Field(default=None, min_length=10, max_length=20)
+    whatsapp: Optional[str] = Field(default=None, max_length=20)
+    email: Optional[str] = Field(default=None, max_length=255)
+    property_slug: Optional[str] = Field(default=None, max_length=150)
+    property_name: Optional[str] = Field(default=None, max_length=150)
+    location: Optional[str] = Field(default=None, max_length=150)
+    budget: Optional[str] = Field(default=None, max_length=60)
+    property_type: Optional[str] = Field(default=None, max_length=80)
+    requirement: Optional[str] = Field(default=None, max_length=20)
+    message: Optional[str] = Field(default=None, max_length=2000)
+    source: Optional[str] = Field(default=None, max_length=60)
+    contact_time: Optional[str] = Field(default=None, max_length=60)
+
+
+EDITABLE_TEXT = {
+    "name": 80, "email": 255, "property_slug": 150, "property_name": 150, "location": 150, "budget": 60,
+    "property_type": 80, "message": 2000, "source": 60, "contact_time": 60,
+}
+
+
+class LeadAdminCreate(LeadCreate):
+    """A lead entered by staff (phone call, walk-in, referral...)."""
+
+    kind: LeadKind = "contact"
+    source: Optional[str] = Field(default="manual", max_length=60)
+    status: Optional[str] = Field(default=None, max_length=20)
+    assigned_to_id: Optional[int] = Field(default=None, ge=1)
+    follow_up_at: Optional[datetime] = None
+    owner_notes: str = Field(default="", max_length=5000)
+
+
+class AuditEntry(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    actor_name: str
+    action: str
+    detail: str
+    created_at: datetime
 
 
 class FollowUpCreate(BaseModel):
@@ -297,6 +365,7 @@ def create_lead(
         status="requested" if payload.kind in APPOINTMENT_KINDS else "new",
         name=payload.name,
         phone=payload.phone,
+        whatsapp=payload.whatsapp,
         email=str(payload.email).lower() if payload.email else None,
         property_slug=clean(payload.property_slug, 150),
         property_name=clean(payload.property_name, 150),
@@ -316,6 +385,7 @@ def create_lead(
     )
     db.add(lead)
     db.flush()
+    audit.record(db, None, "created", "lead", lead.reference, f"Submitted on the website ({lead.source_page or 'unknown page'}).")
 
     title = KIND_TITLES[payload.kind]
     if payload.kind == "property_enquiry" and lead.property_name:
