@@ -627,7 +627,7 @@ export default function Videos() {
                 <h2 id="instagram-videos-heading" className="font-display text-2xl font-semibold text-[#142536]">
                   Instagram videos
                 </h2>
-                <p className="mt-1 text-sm text-[#68717a]">Reels and videos from @manishpurwar007</p>
+                <p className="mt-1 text-sm text-[#68717a]">Reels and videos from Instagram</p>
               </div>
               <a
                 href="https://www.instagram.com/manishpurwar007/"

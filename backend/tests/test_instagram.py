@@ -78,7 +78,7 @@ def test_instagram_feed_uses_server_token_and_returns_video_posts(client, monkey
     assert result["configured"] is True
     assert [video["id"] for video in result["videos"]] == ["instagram-video-1", "instagram-carousel-1"]
     assert result["videos"][0]["title"] == "A property tour"
-    assert result["videos"][0]["channel"] == "@manishpurwar007"
+    assert result["videos"][0]["channel"] == "Instagram"
     assert result["next_cursor"] == "next-cursor"
     assert captured["authorization"] == "Bearer private-test-token"
     assert "private-test-token" not in captured["url"]

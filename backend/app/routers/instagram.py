@@ -15,7 +15,6 @@ from ..config import env
 router = APIRouter(prefix="/instagram", tags=["Instagram"])
 logger = logging.getLogger("gratia.instagram")
 
-INSTAGRAM_USERNAME = "manishpurwar007"
 PAGE_SIZE = 50
 CACHE_SECONDS = 300
 _cache: dict[tuple[str, str], tuple[float, dict]] = {}
@@ -130,7 +129,7 @@ def _video_items(payload: dict) -> list[dict]:
                 "url": permalink,
                 "description": caption,
                 "source": "instagram",
-                "channel": f"@{INSTAGRAM_USERNAME}",
+                "channel": "Instagram",
                 "thumbnail_url": item.get("thumbnail_url", "") if isinstance(item.get("thumbnail_url"), str) else "",
                 "timestamp": item.get("timestamp", ""),
             }
