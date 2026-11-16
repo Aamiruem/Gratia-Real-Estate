@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
 import {
   BarChart3,
@@ -10,7 +10,6 @@ import {
   ContactRound,
   Home,
   LayoutDashboard,
-  Menu,
   Phone,
   Settings,
   UsersRound,
@@ -41,8 +40,7 @@ const STAFF_LINKS = [
 ];
 
 /** A responsive site menu available to visitors and signed-in staff. */
-export default function AdminRail() {
-  const [open, setOpen] = useState(false);
+export default function AdminRail({ open, setOpen }) {
   const { pathname } = useLocation();
   const { isStaff, role } = useOwner();
   const staffLinks = STAFF_LINKS.filter((item) => !item.roles || item.roles.includes(role));
@@ -67,18 +65,6 @@ export default function AdminRail() {
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        aria-label="Open site menu"
-        aria-expanded={open}
-        aria-controls="site-side-menu"
-        title="Open menu"
-        className="fixed left-3 top-[88px] z-[55] grid size-11 place-items-center rounded-full border border-[#e7e2d8] bg-white/95 text-[#142536] shadow-[0_8px_24px_rgba(13,27,42,.16)] backdrop-blur transition hover:border-[#c9a45c] hover:bg-[#fbf6ea] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#c9a45c]/30"
-      >
-        <Menu size={20} aria-hidden="true" />
-      </button>
-
       {open && (
         <>
           <button type="button" onClick={() => setOpen(false)} aria-label="Close site menu" className="fixed inset-0 z-[60] cursor-default bg-[#0d1b2a]/45 backdrop-blur-[2px]" />

@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
 import Header from "./Header";
 import Footer from "./Footer";
@@ -12,6 +12,7 @@ import { trackPageView } from "../analytics/analytics";
 
 export default function Layout({ children }) {
   const { pathname } = useLocation();
+  const [menuOpen, setMenuOpen] = useState(false);
 
   // Scroll to top only when the page changes, not when query params change
   // (e.g. typing in the blog search), which would otherwise jump the page.
@@ -38,9 +39,9 @@ export default function Layout({ children }) {
 
   return (
     <>
-      <Header />
+      <Header menuOpen={menuOpen} onMenuOpen={() => setMenuOpen(true)} />
       {/* Shared site menu with visitor navigation and staff shortcuts. */}
-      <AdminRail />
+      <AdminRail open={menuOpen} setOpen={setMenuOpen} />
       <div>
         <main>{children}</main>
         <Footer />
