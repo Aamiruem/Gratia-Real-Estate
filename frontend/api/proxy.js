@@ -17,6 +17,7 @@ const HOP_BY_HOP = new Set([
   "content-length",
   "content-encoding",
   "accept-encoding",
+  "expect",
 ]);
 
 async function readBody(req) {
