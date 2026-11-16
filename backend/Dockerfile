@@ -8,5 +8,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app ./app
 
+# Rebuild the checked-in model from the included dataset on each deployment.
+RUN python -m app.predictor.train_model
+
 EXPOSE 8000
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers", "--forwarded-allow-ips=*"]

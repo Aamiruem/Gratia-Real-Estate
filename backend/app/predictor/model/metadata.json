@@ -1,0 +1,289 @@
+{
+  "version": "gratia-ncr-random-forest-v1",
+  "sample_count": 996,
+  "training_rows": 796,
+  "validation_rows": 200,
+  "mae_inr": 3658534.988674519,
+  "rmse_inr": 4499051.862588919,
+  "mape_pct": 7.139059175185408,
+  "r2": 0.9768163699861683,
+  "absolute_error_p90_pct": 13.812770832140384,
+  "trained_at": "2026-11-16T10:52:00.120151+00:00",
+  "data_provenance": "Repository-supplied CSV; no source/date metadata provided.",
+  "numeric_ranges": {
+    "area": {
+      "min": 853.0,
+      "max": 6499.0
+    },
+    "bedrooms": {
+      "min": 1.0,
+      "max": 5.0
+    },
+    "bathrooms": {
+      "min": 1.0,
+      "max": 5.0
+    },
+    "floor": {
+      "min": 0.0,
+      "max": 24.0
+    },
+    "total_floors": {
+      "min": 4.0,
+      "max": 30.0
+    },
+    "property_age": {
+      "min": 0.0,
+      "max": 15.0
+    },
+    "parking": {
+      "min": 0.0,
+      "max": 3.0
+    },
+    "balcony": {
+      "min": 0.0,
+      "max": 4.0
+    },
+    "amenities_count": {
+      "min": 3.0,
+      "max": 4.0
+    },
+    "metro_distance": {
+      "min": 0.31,
+      "max": 11.96
+    },
+    "school_distance": {
+      "min": 0.5,
+      "max": 10.0
+    },
+    "hospital_distance": {
+      "min": 0.5,
+      "max": 11.97
+    },
+    "main_road_distance": {
+      "min": 0.1,
+      "max": 6.0
+    }
+  },
+  "options": {
+    "location": [
+      "Delhi",
+      "Faridabad",
+      "Greater Noida",
+      "Gurgaon",
+      "Noida"
+    ],
+    "property_type": [
+      "Apartment",
+      "Builder Floor",
+      "Plot",
+      "Villa"
+    ],
+    "lift": [
+      "No",
+      "Yes"
+    ],
+    "furnishing": [
+      "Fully Furnished",
+      "Semi-Furnished",
+      "Unfurnished"
+    ],
+    "facing": [
+      "East",
+      "North",
+      "North-East",
+      "North-West",
+      "South",
+      "South-East",
+      "South-West",
+      "West"
+    ],
+    "amenities": [
+      "Gym,Park,Security",
+      "Gym,Pool,Clubhouse",
+      "Gym,Pool,Park,Clubhouse",
+      "Park,Security,Power Backup",
+      "Pool,Clubhouse,Lift"
+    ],
+    "gated_community": [
+      "No",
+      "Yes"
+    ],
+    "security": [
+      "No",
+      "Yes"
+    ],
+    "power_backup": [
+      "No",
+      "Yes"
+    ],
+    "water_supply": [
+      "12 Hours",
+      "24x7",
+      "Borewell"
+    ],
+    "property_status": [
+      "New Launch",
+      "Ready to Move",
+      "Under Construction"
+    ]
+  },
+  "localities_by_location": {
+    "Delhi": [
+      "Dwarka",
+      "Greater Kailash",
+      "Rohini",
+      "Saket",
+      "Vasant Kunj"
+    ],
+    "Faridabad": [
+      "Greater Faridabad",
+      "NIT",
+      "Sector 14",
+      "Sector 15",
+      "Sector 88"
+    ],
+    "Greater Noida": [
+      "Alpha",
+      "Beta",
+      "Knowledge Park",
+      "Techzone",
+      "Yamuna Expressway"
+    ],
+    "Gurgaon": [
+      "Dwarka Expressway",
+      "Golf Course Road",
+      "MG Road",
+      "New Gurgaon",
+      "Sohna Road"
+    ],
+    "Noida": [
+      "Sector 137",
+      "Sector 150",
+      "Sector 62",
+      "Sector 75",
+      "Sector 78"
+    ]
+  },
+  "feature_importance": [
+    {
+      "feature": "numeric__area",
+      "importance": 0.6219842285468202
+    },
+    {
+      "feature": "categorical__location_Delhi",
+      "importance": 0.14753569498311814
+    },
+    {
+      "feature": "categorical__location_Gurgaon",
+      "importance": 0.11260840328241141
+    },
+    {
+      "feature": "categorical__location_Noida",
+      "importance": 0.052983592131656355
+    },
+    {
+      "feature": "categorical__location_Greater Noida",
+      "importance": 0.026815025955602274
+    },
+    {
+      "feature": "categorical__location_Faridabad",
+      "importance": 0.022356108635015467
+    },
+    {
+      "feature": "categorical__property_type_Villa",
+      "importance": 0.0015763124555642953
+    },
+    {
+      "feature": "numeric__metro_distance",
+      "importance": 0.001470835664148544
+    },
+    {
+      "feature": "numeric__total_floors",
+      "importance": 0.0011740033012189244
+    },
+    {
+      "feature": "numeric__floor",
+      "importance": 0.0010525013329755288
+    },
+    {
+      "feature": "numeric__hospital_distance",
+      "importance": 0.000963514612254082
+    },
+    {
+      "feature": "numeric__school_distance",
+      "importance": 0.000958549089856754
+    },
+    {
+      "feature": "numeric__property_age",
+      "importance": 0.0009387480861268667
+    },
+    {
+      "feature": "numeric__main_road_distance",
+      "importance": 0.0009098669052082564
+    },
+    {
+      "feature": "numeric__bedrooms",
+      "importance": 0.0006073073398462777
+    },
+    {
+      "feature": "numeric__bathrooms",
+      "importance": 0.0005904836931000275
+    },
+    {
+      "feature": "numeric__balcony",
+      "importance": 0.00046042430012367474
+    },
+    {
+      "feature": "categorical__property_type_Plot",
+      "importance": 0.0004286696856918834
+    },
+    {
+      "feature": "numeric__parking",
+      "importance": 0.0004283202619621827
+    },
+    {
+      "feature": "categorical__furnishing_Fully Furnished",
+      "importance": 0.000305720954927051
+    },
+    {
+      "feature": "categorical__amenities_Pool,Clubhouse,Lift",
+      "importance": 0.00024833087822739364
+    },
+    {
+      "feature": "categorical__property_status_Under Construction",
+      "importance": 0.00020110362169527683
+    },
+    {
+      "feature": "categorical__property_type_Builder Floor",
+      "importance": 0.00019313038596286753
+    },
+    {
+      "feature": "categorical__property_status_Ready to Move",
+      "importance": 0.00018834533542587235
+    },
+    {
+      "feature": "categorical__water_supply_Borewell",
+      "importance": 0.00016955764242647037
+    },
+    {
+      "feature": "categorical__property_type_Apartment",
+      "importance": 0.00016661203185288612
+    },
+    {
+      "feature": "categorical__water_supply_12 Hours",
+      "importance": 0.00014007838787098543
+    },
+    {
+      "feature": "categorical__amenities_Park,Security,Power Backup",
+      "importance": 0.00013928575083097932
+    },
+    {
+      "feature": "categorical__water_supply_24x7",
+      "importance": 0.0001383456952960806
+    },
+    {
+      "feature": "categorical__furnishing_Semi-Furnished",
+      "importance": 0.0001318997588958562
+    }
+  ]
+}

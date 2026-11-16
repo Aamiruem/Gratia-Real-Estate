@@ -35,6 +35,7 @@ const projects = await loadProjects();
 const pages = [
   { path: "/about", title: "About Gratia Estates | Gurgaon Real Estate Advisory", description: "Get to know Gratia Estates, a Gurgaon-focused real estate advisory helping buyers explore and compare residential projects with clarity." },
   { path: "/projects", title: "Gurgaon Property Projects | New Launch & Ready-to-Move Flats | Gratia Estates", description: "Browse curated residential projects in Gurgaon from DLF, SOBHA, Godrej, M3M and more, including pre-launch, launched, under-construction and ready-to-move homes." },
+  { path: "/price-prediction", title: "Gurgaon Property Price Estimate | Gratia Estates", description: "Explore a model-based indicative property price estimate for Delhi-NCR homes using size, locality, property type and amenities. Estimates are not certified appraisals." },
   { path: "/videos", title: "Property Videos | Gratia Estates", description: "Watch real estate and residential project videos curated by Gratia Estates." },
   { path: "/blog", title: "Gurgaon Real Estate Blog, Guides & Videos | Gratia Estates", description: "Gurgaon property buying guides, site visit checklists, cost breakdowns, location insights and project video walkthroughs from Gratia Estates." },
   { path: "/contact", title: "Contact Gratia Estates | Gurgaon Property Help & Support", description: "Questions about Gurgaon property? Contact Gratia Estates by phone, WhatsApp or email. Our team is glad to help with projects, pricing, home loans and paperwork." },

@@ -37,6 +37,7 @@ from .routers.auth import router as auth_router
 from .routers.password_auth import router as password_auth_router
 from .routers.chat import router as chat_router
 from .routers.crm_voice import router as crm_voice_router, webhook_router as retell_webhook_router
+from .routers.predictions import router as predictions_router
 from .routers.properties import admin_router as properties_admin_router
 from .routers.properties import public_router as properties_router
 from .routers.properties import seed_properties
@@ -161,6 +162,7 @@ app.include_router(settings_router)
 app.include_router(push_router)
 app.include_router(chat_router)
 app.include_router(crm_voice_router)
+app.include_router(predictions_router)
 app.include_router(retell_webhook_router)
 
 

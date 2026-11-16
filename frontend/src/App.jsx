@@ -22,6 +22,7 @@ const AdminApp = lazy(() => import("./admin/AdminApp"));
 const Residential = lazy(() => import("./pages/Residential"));
 const Commercial = lazy(() => import("./pages/Commercial"));
 const Services = lazy(() => import("./pages/Services"));
+const PricePrediction = lazy(() => import("./prediction/pages/Prediction"));
 const CookiePolicy = lazy(() => import("./pages/CookiePolicy"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
@@ -96,6 +97,7 @@ export default function App() {
             <Route path="/residential" element={<Residential />} />
             <Route path="/commercial" element={<Commercial />} />
             <Route path="/services" element={<Services />} />
+            <Route path="/price-prediction" element={<PricePrediction />} />
             <Route path="/cookie-policy" element={<CookiePolicy />} />
             <Route path="/admin/*" element={<AdminApp />} />
             <Route path="*" element={<NotFound />} />
