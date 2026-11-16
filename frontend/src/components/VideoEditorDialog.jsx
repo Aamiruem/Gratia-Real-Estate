@@ -1,5 +1,5 @@
 import { Check, Film, Link2, Loader2, Plus, Trash2, Upload, X } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { projects } from "../data/projects";
 import { deleteUploadedVideo, getVideoSource, uploadVideoFile } from "../utils/videoLibrary";
 import VideoPreview from "./VideoPreview";
@@ -21,23 +21,17 @@ export default function VideoEditorDialog({ initial, focus = "title", onSave, on
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
-  const [previewUrl, setPreviewUrl] = useState("");
   const [uploadProgress, setUploadProgress] = useState(0);
   const titleRef = useRef(null);
   const urlRef = useRef(null);
   const fileRef = useRef(null);
   const linkedSource = getVideoSource(form.url.trim());
+  const previewUrl = useMemo(() => selectedFile ? URL.createObjectURL(selectedFile) : "", [selectedFile]);
   const source = previewUrl ? { type: "file", src: previewUrl } : linkedSource;
 
-  useEffect(() => {
-    if (!selectedFile) {
-      setPreviewUrl("");
-      return undefined;
-    }
-    const url = URL.createObjectURL(selectedFile);
-    setPreviewUrl(url);
-    return () => URL.revokeObjectURL(url);
-  }, [selectedFile]);
+  useEffect(() => () => {
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+  }, [previewUrl]);
 
   useEffect(() => {
     (focus === "url" ? urlRef : titleRef).current?.focus();
@@ -124,7 +118,7 @@ export default function VideoEditorDialog({ initial, focus = "title", onSave, on
           <p className="text-[11px] font-bold uppercase tracking-[.16em] text-[#e1c98f]">Live preview</p>
           <div className="mt-3 aspect-video overflow-hidden rounded-2xl bg-black">
             {source ? (
-              <VideoPreview key={form.url} video={{ title: form.title || "Preview", url: form.url.trim() }} showLogo={false} />
+              <VideoPreview key={source.src || form.url} video={{ title: form.title || "Preview", url: source.src || form.url.trim() }} showLogo={false} />
             ) : (
               <div className="grid h-full place-items-center p-6 text-center text-sm text-white/60">
                 <span>

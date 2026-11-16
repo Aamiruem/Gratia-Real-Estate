@@ -5,6 +5,9 @@
 // vercel.json rewrites /api/* to this function. Keeping the API on the same
 // origin as the site means session cookies work without cross-site settings.
 
+import videoBlobUpload from "./video-blob-upload.js";
+import videoBlobDelete from "./video-blob-delete.js";
+
 const HOP_BY_HOP = new Set([
   "connection",
   "keep-alive",
@@ -24,14 +27,52 @@ async function readBody(req) {
 }
 
 export default async function handler(req, res) {
+  const incoming = new URL(req.url, "http://placeholder");
+  const path = (incoming.searchParams.get("__path") || "").replace(/^\/+/, "");
+  let body = req.body;
+  if (typeof body === "string" || Buffer.isBuffer(body)) {
+    try {
+      body = JSON.parse(Buffer.isBuffer(body) ? body.toString("utf8") : body);
+    } catch {
+      body = null;
+    }
+  }
+  if ((!body || typeof body !== "object") && req.method !== "GET" && req.method !== "HEAD") {
+    const rawBody = await readBody(req);
+    try {
+      body = JSON.parse(Buffer.isBuffer(rawBody) ? rawBody.toString("utf8") : String(rawBody || ""));
+    } catch {
+      body = null;
+    }
+  }
+
+  // These requests use the same-origin proxy rewrite, so dispatch them to the
+  // Blob handlers here instead of forwarding them to the application API.
+  if (path === "video-blob-upload" || String(body?.type || "").startsWith("blob.")) {
+    if (!body || typeof body !== "object") {
+      res.status(400).json({ detail: "The upload request body must be valid JSON." });
+      return;
+    }
+    req.body = body;
+    await videoBlobUpload(req, res);
+    return;
+  }
+  if (path === "video-blob-delete" || (typeof body?.url === "string" && body.url.includes(".public.blob.vercel-storage.com/project-videos/"))) {
+    if (!body || typeof body !== "object") {
+      res.status(400).json({ detail: "The delete request body must be valid JSON." });
+      return;
+    }
+    req.body = body;
+    await videoBlobDelete(req, res);
+    return;
+  }
+
   const backend = (process.env.BACKEND_URL || "").trim().replace(/\/+$/, "");
   if (!backend) {
     res.status(503).json({ detail: "The API is not connected yet. Set BACKEND_URL in the Vercel project settings." });
     return;
   }
 
-  const incoming = new URL(req.url, "http://placeholder");
-  const path = (incoming.searchParams.get("__path") || "").replace(/^\/+/, "");
   incoming.searchParams.delete("__path");
   const query = incoming.searchParams.toString();
   // Keep the /api prefix: the backend accepts it and scopes cookies to it.
