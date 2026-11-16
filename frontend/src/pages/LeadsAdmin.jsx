@@ -11,6 +11,7 @@ import {
   Megaphone,
   MessageCircle,
   Phone,
+  PhoneCall,
   RefreshCw,
   Search,
   TrendingUp,
@@ -169,7 +170,9 @@ function Dashboard({ embedded = false }) {
           ? "Notes saved"
           : changes.assigned_to_id !== undefined
             ? "Assignment saved"
-            : `Status changed to ${label(updated.status)}`,
+            : changes.call_consent !== undefined
+              ? `AI phone-call consent ${updated.call_consent ? "recorded" : "withdrawn"}`
+              : `Status changed to ${label(updated.status)}`,
       );
     } catch (err) {
       toast(err.message, "error");
@@ -315,6 +318,7 @@ function LeadCard({ lead, team, highlighted, onUpdate }) {
   const [notes, setNotes] = useState(lead.owner_notes);
   const [showNotes, setShowNotes] = useState(Boolean(lead.owner_notes));
   const [showHistory, setShowHistory] = useState(highlighted);
+  const [calling, setCalling] = useState(false);
   const appointment = APPOINTMENT_KINDS.has(lead.kind);
   const statuses = appointment ? VISIT_STATUSES : LEAD_STATUSES;
   const details = [
@@ -328,6 +332,22 @@ function LeadCard({ lead, team, highlighted, onUpdate }) {
     ["Best time to call", lead.contact_time],
     ["Source", lead.source],
   ].filter(([, value]) => value);
+
+  const startAiCall = async () => {
+    if (!lead.call_consent || calling) return;
+    if (!window.confirm(`Start an AI phone call to ${lead.name} at ${lead.phone}? Confirm the customer has agreed to receive this call.`)) return;
+    setCalling(true);
+    try {
+      const call = await adminApi.startCrmVoiceCall(lead.reference);
+      toast(`AI call started for ${lead.reference}`);
+      setShowHistory(true);
+      return call;
+    } catch (error) {
+      toast(error.message, "error");
+    } finally {
+      setCalling(false);
+    }
+  };
 
   return (
     <li
@@ -415,7 +435,35 @@ function LeadCard({ lead, team, highlighted, onUpdate }) {
           {showHistory ? "Hide follow-ups" : "Follow-ups & history"}
         </button>
       </div>
-      {showHistory && <FollowUpPanel lead={lead} statuses={statuses} onChanged={(changes) => onUpdate(lead.reference, changes, true)} />}
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#e7e2d8] bg-[#fbfaf7] px-3 py-2.5">
+        <label className="inline-flex items-start gap-2 text-xs leading-5 text-[#263746]">
+          <input
+            type="checkbox"
+            checked={Boolean(lead.call_consent)}
+            onChange={(event) => onUpdate(lead.reference, { call_consent: event.target.checked })}
+            className="mt-1 size-4 accent-[#142536]"
+          />
+          <span>
+            Customer has consented to AI phone contact
+            {lead.call_consent_at && <span className="block text-[11px] text-[#5e6872]">Recorded {new Date(lead.call_consent_at).toLocaleString("en-IN")}</span>}
+          </span>
+        </label>
+        <button
+          type="button"
+          onClick={startAiCall}
+          disabled={!lead.call_consent || calling}
+          className="inline-flex items-center gap-2 rounded-full bg-[#142536] px-4 py-2 text-xs font-bold text-white transition hover:bg-[#c9a45c] hover:text-[#142536] disabled:cursor-not-allowed disabled:opacity-45"
+        >
+          {calling ? <Loader2 size={14} className="animate-spin" aria-hidden="true" /> : <PhoneCall size={14} aria-hidden="true" />}
+          {calling ? "Starting call…" : "Start AI call"}
+        </button>
+      </div>
+      {showHistory && (
+        <>
+          <FollowUpPanel lead={lead} statuses={statuses} onChanged={(changes) => onUpdate(lead.reference, changes, true)} />
+          <VoiceCallHistory leadReference={lead.reference} />
+        </>
+      )}
 
       <div className="mt-3">
         {showNotes ? (
@@ -447,6 +495,33 @@ function LeadCard({ lead, team, highlighted, onUpdate }) {
         )}
       </div>
     </li>
+  );
+}
+
+function VoiceCallHistory({ leadReference }) {
+  const [calls, setCalls] = useState(null);
+  useEffect(() => {
+    adminApi.crmVoiceCalls(leadReference).then((result) => setCalls(result.items || []), () => setCalls([]));
+  }, [leadReference]);
+  return (
+    <div className="mt-3 rounded-xl border border-[#e7e2d8] bg-white p-3">
+      <p className="text-xs font-bold uppercase tracking-wide text-[#80602b]">AI call history</p>
+      {calls === null ? (
+        <p className="mt-2 text-xs text-[#5e6872]">Loading calls…</p>
+      ) : calls.length ? (
+        <ul className="mt-2 space-y-2">
+          {calls.map((call) => (
+            <li key={call.call_id} className="rounded-lg bg-[#fbfaf7] px-3 py-2 text-xs">
+              <p className="font-semibold text-[#142536]">{label(call.direction)} · {label(call.status)}</p>
+              <p className="mt-0.5 text-[#5e6872]">{new Date(call.created_at).toLocaleString("en-IN")}</p>
+              {call.summary && <p className="mt-1 whitespace-pre-line text-[#263746]">{call.summary}</p>}
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="mt-2 text-xs text-[#5e6872]">No AI calls recorded for this lead.</p>
+      )}
+    </div>
   );
 }
 

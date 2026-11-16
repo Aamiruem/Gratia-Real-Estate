@@ -175,6 +175,9 @@ class Lead(Base):
     source: Mapped[str | None] = mapped_column(String(60), index=True, nullable=True)  # organic, direct, social...
     assigned_to_id: Mapped[int | None] = mapped_column(Integer, index=True, nullable=True)
     follow_up_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True, nullable=True)
+    call_consent: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    call_consent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    call_consent_by_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     # SHA-256 of the submitting device's key: lets us send the customer updates in their bell.
     device_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, index=True, nullable=False)
@@ -216,6 +219,25 @@ class FollowUp(Base):
     note: Mapped[str] = mapped_column(Text, nullable=False)
     next_action_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, nullable=False)
+
+
+class VoiceCall(Base):
+    """CRM call metadata received from Retell; transcripts and recordings are not stored."""
+
+    __tablename__ = "crm_voice_calls"
+
+    call_id: Mapped[str] = mapped_column(String(100), primary_key=True)
+    lead_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("leads.id", ondelete="SET NULL"), index=True, nullable=True)
+    initiated_by_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    direction: Mapped[str] = mapped_column(String(10), nullable=False)
+    status: Mapped[str] = mapped_column(String(40), default="registered", nullable=False)
+    from_number: Mapped[str] = mapped_column(String(30), default="", nullable=False)
+    to_number: Mapped[str] = mapped_column(String(30), default="", nullable=False)
+    summary: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, onupdate=_now, nullable=False)
 
 
 class Property(Base):

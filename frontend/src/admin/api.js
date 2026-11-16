@@ -6,6 +6,17 @@ export const adminApi = {
   overview: () => apiRequest("/admin/overview"),
   analytics: (days = 30) => apiRequest(`/admin/analytics?days=${days}`),
   reports: (days = 90) => apiRequest(`/admin/reports?days=${days}`),
+  crmVoiceStatus: () => apiRequest("/admin/crm/voice/status"),
+  crmVoiceAssistant: (messages) =>
+    apiRequest("/admin/crm/voice/assistant", json("POST", { messages })),
+  confirmCrmVoiceFollowUp: (proposal) =>
+    apiRequest("/admin/crm/voice/assistant/follow-up", json("POST", { ...proposal, confirmed: true })),
+  startCrmVoiceCall: (leadReference) =>
+    apiRequest("/admin/crm/voice/calls", json("POST", { lead_reference: leadReference, confirmed: true })),
+  crmVoiceCalls: (leadReference) => {
+    const query = leadReference ? `?lead_reference=${encodeURIComponent(leadReference)}` : "";
+    return apiRequest(`/admin/crm/voice/calls${query}`);
+  },
   crmSummary: (params = {}) => {
     const query = new URLSearchParams(
       Object.entries(params).filter(([, value]) => value !== "" && value !== undefined),

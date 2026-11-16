@@ -192,6 +192,8 @@ class LeadResponse(BaseModel):
     source: Optional[str] = None
     assigned_to_id: Optional[int] = None
     follow_up_at: Optional[datetime] = None
+    call_consent: bool = False
+    call_consent_at: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
 
@@ -210,6 +212,7 @@ class LeadUpdate(BaseModel):
     assigned_to_id: Optional[int] = Field(default=None, ge=0)
     follow_up_at: Optional[datetime] = None
     clear_follow_up: bool = False
+    call_consent: Optional[bool] = None
     # Editable customer / enquiry details (staff "Edit details").
     name: Optional[str] = Field(default=None, min_length=2, max_length=80)
     phone: Optional[str] = Field(default=None, min_length=10, max_length=20)
@@ -742,6 +745,11 @@ def update_lead(
     elif payload.follow_up_at is not None:
         lead.follow_up_at = payload.follow_up_at
         changes.append(f"follow-up: {payload.follow_up_at.strftime('%d %b %Y %H:%M')}")
+    if payload.call_consent is not None and payload.call_consent != lead.call_consent:
+        lead.call_consent = payload.call_consent
+        lead.call_consent_at = datetime.now(timezone.utc) if payload.call_consent else None
+        lead.call_consent_by_id = staff.id if payload.call_consent else None
+        changes.append("AI phone-call consent recorded" if payload.call_consent else "AI phone-call consent withdrawn")
     if payload.status is not None:
         if payload.status not in allowed_statuses(lead.kind):
             raise HTTPException(status_code=422, detail=f"Status must be one of: {', '.join(allowed_statuses(lead.kind))}")

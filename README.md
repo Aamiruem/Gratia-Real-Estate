@@ -80,6 +80,15 @@ SMTP_FROM=Gratia Estates <yourname@gmail.com>
 Always set `OWNER_PHONE_NUMBER` (the only number allowed to sign in).
 Users can type it as `98765 43210`, `09876543210` or `+91 98765 43210`.
 
+**CRM voice assistant and calls:** Set `OPENAI_API_KEY` to enable the staff-only
+voice assistant. It can read minimized lead/property summaries and propose a
+follow-up; staff must confirm before it is saved. To enable phone calls, set
+`RETELL_API_KEY`, `RETELL_AGENT_ID` and `RETELL_PHONE_NUMBER`, bind inbound and
+outbound agents to the number in Retell, and register
+`https://<site>/api/webhooks/retell` as the signed webhook URL. Outbound calls
+are admin-initiated only and require the lead's CRM call-consent flag. Store
+provider credentials in the hosting dashboard, never in source control.
+
 Security built in: codes are 6 digits, valid 10 minutes, stored only as a
 keyed hash, max 5 wrong attempts, one send per 30 seconds, and dev-mode
 codes are only shown to requests from the same computer.

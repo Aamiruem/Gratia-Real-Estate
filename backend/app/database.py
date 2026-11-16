@@ -57,6 +57,7 @@ def create_tables():
         User,
         Video,
         VideoReaction,
+        VoiceCall,
     )
 
     Base.metadata.create_all(bind=engine)

@@ -22,6 +22,7 @@ import {
 import SEO from "../components/SEO";
 import Logo from "../components/Logo";
 import NotificationBell from "../components/notifications/NotificationBell";
+import CrmVoiceAssistant from "./components/CrmVoiceAssistant";
 import useOwner, { notifyAuthChanged } from "../hooks/useOwner";
 import { authApi } from "../services/authApi";
 
@@ -167,6 +168,7 @@ function AdminShell({ role, user }) {
           </Suspense>
         </main>
       </div>
+      <CrmVoiceAssistant />
     </div>
   );
 }

@@ -71,6 +71,13 @@ services:
         sync: false
       - key: OPENAI_MODEL
         value: gpt-4.1-mini
+      # Retell AI outbound calls and signed call-status webhooks.
+      - key: RETELL_API_KEY
+        sync: false
+      - key: RETELL_AGENT_ID
+        sync: false
+      - key: RETELL_PHONE_NUMBER
+        sync: false
       # Vercel -> Project -> Settings -> Git -> Deploy Hooks: rebuilds the sitemap
       # when properties change in the admin panel.
       - key: VERCEL_DEPLOY_HOOK_URL
