@@ -21,6 +21,8 @@ from .. import audit, config, ratelimit
 from ..database import get_db
 from ..models import FollowUp, Lead, Property, User, VoiceCall
 from ..permissions import require_any_staff, staff_role
+from ..predictor import service as prediction_service
+from .predictions import PropertyPredictionRequest
 
 router = APIRouter(prefix="/admin/crm/voice", tags=["CRM voice"])
 webhook_router = APIRouter(prefix="/webhooks/retell", tags=["Retell webhooks"])
@@ -76,6 +78,23 @@ def _assistant_test_mode(db: Session) -> bool:
     return not bool(config.env("OPENAI_API_KEY")) and _assistant_setting_enabled(db)
 
 
+def _prediction_context() -> str:
+    options = prediction_service.get_options()
+    localities = "\n".join(
+        f"- {city}: {', '.join(names)}"
+        for city, names in options["localities_by_location"].items()
+    )
+    return (
+        "Available estimate inputs (use only exact city, locality, and property type values):\n"
+        f"Cities: {', '.join(options['options']['location'])}\n"
+        f"Property types: {', '.join(options['options']['property_type'])}\n"
+        f"Localities by city:\n{localities}\n"
+        "The estimator needs city, locality, property type, area in square feet, bedrooms, and bathrooms. "
+        "Optional property attributes may be omitted and use model defaults. Never invent missing required details. "
+        "Ask a short follow-up question if a required input is missing. State clearly that the result is an indicative model estimate, not a certified appraisal."
+    )
+
+
 @router.get("/status")
 def voice_status(
     db: Session = Depends(get_db),
@@ -85,11 +104,16 @@ def voice_status(
         name for name in ("RETELL_API_KEY", "RETELL_AGENT_ID", "RETELL_PHONE_NUMBER")
         if not config.env(name)
     ]
+    try:
+        prediction_ready = prediction_service.get_options()["success"]
+    except (RuntimeError, KeyError):
+        prediction_ready = False
     return {
         "assistant_enabled": _assistant_enabled(db),
         "assistant_test_mode": _assistant_test_mode(db),
         "phone_enabled": not missing_phone_settings,
         "phone_missing_settings": missing_phone_settings,
+        "price_prediction_enabled": prediction_ready,
     }
 
 
@@ -171,12 +195,23 @@ def crm_assistant(
         # transcription and browser speech without sending data to an AI provider.
         query = payload.messages[-1].content.strip()
         snapshot = _crm_context(db)
+        if any(
+            phrase in query.casefold()
+            for phrase in ("price estimate", "estimate price", "property price", "predict price", "valuation", "worth")
+        ):
+            return {
+                "reply": "Test mode: I did not send this request to OpenAI. Open Price estimate in this assistant and enter the property details; the model will calculate an indicative price and read it aloud.",
+                "proposal": None,
+                "price_estimate": None,
+                "mode": "test",
+            }
         return {
             "reply": (
                 "Test mode: no OpenAI request was made. The staff session and CRM data connection are working.\n\n"
                 f"CRM snapshot for ‘{query[:160]}’:\n{snapshot[:1100]}"
             ),
             "proposal": None,
+            "price_estimate": None,
             "mode": "test",
         }
 
@@ -187,30 +222,47 @@ def crm_assistant(
         "Answer concisely in the user's language. You may help staff schedule a follow-up by proposing "
         "the propose_follow_up tool when they explicitly request it and give a lead reference, a short note, "
         "and a future date/time. The tool only creates a proposal; never claim it was saved. The staff member "
-        "must review and confirm the proposal before it is written to the CRM.\n\n"
-        f"{_crm_context(db)}"
+        "must review and confirm the proposal before it is written to the CRM.\n"
+        "For a clear request to estimate a property's price, use estimate_property_price only after the user has "
+        "provided every required input. Do not invent missing details or claim the result is a current asking price. "
+        "Prediction results are read-only and must be described as indicative, never guaranteed.\n\n"
+        f"{_crm_context(db)}\n\n{_prediction_context()}"
     )
+    prediction_options = prediction_service.get_options()
+    prediction_schema = PropertyPredictionRequest.model_json_schema()
+    prediction_schema["properties"]["location"]["enum"] = prediction_options["options"]["location"]
+    prediction_schema["properties"]["property_type"]["enum"] = prediction_options["options"]["property_type"]
     body = {
         "model": config.env("OPENAI_MODEL", "gpt-4.1-mini"),
         "messages": [{"role": "system", "content": system}]
         + [message.model_dump() for message in payload.messages[-10:]],
-        "tools": [{
-            "type": "function",
-            "function": {
-                "name": "propose_follow_up",
-                "description": "Propose a follow-up for a CRM lead. The staff member must confirm it before saving.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "lead_reference": {"type": "string"},
-                        "note": {"type": "string"},
-                        "next_action_at": {"type": "string", "description": "ISO 8601 date/time with timezone"},
+        "tools": [
+            {
+                "type": "function",
+                "function": {
+                    "name": "propose_follow_up",
+                    "description": "Propose a follow-up for a CRM lead. The staff member must confirm it before saving.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "lead_reference": {"type": "string"},
+                            "note": {"type": "string"},
+                            "next_action_at": {"type": "string", "description": "ISO 8601 date/time with timezone"},
+                        },
+                        "required": ["lead_reference", "note", "next_action_at"],
+                        "additionalProperties": False,
                     },
-                    "required": ["lead_reference", "note", "next_action_at"],
-                    "additionalProperties": False,
                 },
             },
-        }],
+            {
+                "type": "function",
+                "function": {
+                    "name": "estimate_property_price",
+                    "description": "Calculate an indicative price estimate from the trained NCR model. Use only when all required property details are provided.",
+                    "parameters": prediction_schema,
+                },
+            },
+        ],
         "tool_choice": "auto",
         "max_tokens": 500,
         "temperature": 0.2,
@@ -231,7 +283,26 @@ def crm_assistant(
         calls = message.get("tool_calls") or []
         if calls:
             tool = calls[0].get("function", {})
-            if tool.get("name") != "propose_follow_up":
+            tool_name = tool.get("name")
+            if tool_name == "estimate_property_price":
+                estimate_request = PropertyPredictionRequest.model_validate_json(tool.get("arguments", "{}"))
+                estimate_data = estimate_request.model_dump()
+                if estimate_data["location"] not in prediction_options["options"]["location"]:
+                    raise HTTPException(status_code=422, detail="Choose a city supported by the current training data.")
+                if estimate_data["locality"] not in prediction_options["localities_by_location"].get(estimate_data["location"], []):
+                    raise HTTPException(status_code=422, detail="Choose a locality listed for the selected city.")
+                if estimate_data["property_type"] not in prediction_options["options"]["property_type"]:
+                    raise HTTPException(status_code=422, detail="Choose a property type supported by the model.")
+                estimate = prediction_service.predict(estimate_data)
+                estimate["created_at"] = datetime.now(timezone.utc)
+                return {
+                    "reply": "I calculated an indicative model estimate from those property details. The estimate and its tested range are shown below; this is not a certified appraisal.",
+                    "proposal": None,
+                    "price_estimate": estimate,
+                    "property_data": estimate_data,
+                    "mode": "live",
+                }
+            if tool_name != "propose_follow_up":
                 raise ValueError("Unexpected assistant action.")
             proposal = FollowUpProposal.model_validate_json(tool.get("arguments", "{}"))
             lead = db.scalar(select(Lead).where(Lead.reference == proposal.lead_reference.upper()))
@@ -255,7 +326,7 @@ def crm_assistant(
         reply = (message.get("content") or "").strip()
         if not reply:
             raise ValueError("Assistant response was empty.")
-        return {"reply": reply[:2000], "proposal": None, "mode": "live"}
+        return {"reply": reply[:2000], "proposal": None, "price_estimate": None, "mode": "live"}
     except HTTPException:
         raise
     except HTTPError as error:

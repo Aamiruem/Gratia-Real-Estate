@@ -1,10 +1,13 @@
 import { useEffect, useRef, useState } from "react";
-import { Headphones, Loader2, Mic, MicOff, Phone, RefreshCw, Send, X } from "lucide-react";
+import { Calculator, Headphones, Loader2, Mic, MicOff, Phone, RefreshCw, Send, X } from "lucide-react";
 import { adminApi } from "../api";
+import PropertyForm from "../../prediction/components/PropertyForm";
+import PredictionCard from "../../prediction/components/PredictionCard";
+import "../../prediction/pages/Prediction.css";
 
 const greeting = {
   role: "assistant",
-  content: "Hi. I can answer questions using CRM summaries and published property data, or draft a follow-up for your review. I never save a change until you confirm it.",
+  content: "Hi. I can answer CRM and published-property questions, estimate a property's price, or draft a follow-up for your review. I never save a change until you confirm it.",
 };
 
 export default function CrmVoiceAssistant() {
@@ -16,6 +19,10 @@ export default function CrmVoiceAssistant() {
   const [messages, setMessages] = useState([greeting]);
   const [draft, setDraft] = useState("");
   const [proposal, setProposal] = useState(null);
+  const [estimateOpen, setEstimateOpen] = useState(false);
+  const [pricePrediction, setPricePrediction] = useState(null);
+  const [pricePropertyData, setPricePropertyData] = useState(null);
+  const [priceSubmitting, setPriceSubmitting] = useState(false);
   const [busy, setBusy] = useState(false);
   const [listening, setListening] = useState(false);
   const [error, setError] = useState("");
@@ -79,17 +86,42 @@ export default function CrmVoiceAssistant() {
     setBusy(true);
     try {
       const result = await adminApi.crmVoiceAssistant(next.filter((message) => message.role !== "assistant" || message !== greeting));
-      const response = { role: "assistant", content: result.reply };
-      setMessages((current) => [...current, response].slice(-12));
+      let assistantReply = result.reply;
       setProposal(result.proposal || null);
-      if ("speechSynthesis" in window && result.reply) {
+      if (result.price_estimate) {
+        setPricePrediction(result.price_estimate);
+        setPricePropertyData(result.property_data || null);
+        setEstimateOpen(true);
+        const currency = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 });
+        assistantReply = `${result.reply} Indicative estimate: ${currency.format(result.price_estimate.predicted_price)}. Range: ${currency.format(result.price_estimate.min_price)} to ${currency.format(result.price_estimate.max_price)}.`;
+      }
+      const response = { role: "assistant", content: assistantReply };
+      setMessages((current) => [...current, response].slice(-12));
+      if ("speechSynthesis" in window && assistantReply) {
         window.speechSynthesis.cancel();
-        window.speechSynthesis.speak(new SpeechSynthesisUtterance(result.reply));
+        const utterance = new SpeechSynthesisUtterance(assistantReply);
+        utterance.lang = "en-IN";
+        window.speechSynthesis.speak(utterance);
       }
     } catch (requestError) {
       setError(requestError.message || "The assistant could not answer.");
     } finally {
       setBusy(false);
+    }
+  };
+
+  const onPricePrediction = (result, propertyData) => {
+    setPricePrediction(result);
+    setPricePropertyData(propertyData);
+    if (!result) return;
+    const currency = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 });
+    const spokenReply = `Indicative model estimate: ${currency.format(result.predicted_price)}. Estimated range: ${currency.format(result.min_price)} to ${currency.format(result.max_price)}. This is not a certified appraisal.`;
+    setMessages((current) => [...current, { role: "assistant", content: spokenReply }].slice(-12));
+    if ("speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(spokenReply);
+      utterance.lang = "en-IN";
+      window.speechSynthesis.speak(utterance);
     }
   };
   const startListening = () => {
@@ -168,7 +200,30 @@ export default function CrmVoiceAssistant() {
               <span className={`rounded-full px-3 py-1 font-semibold ${status?.phone_enabled ? "bg-emerald-100 text-emerald-800" : "bg-slate-200 text-slate-700"}`}>
                 Phone calls {status?.phone_enabled ? "Retell ready" : "Retell setup required"}
               </span>
+              <span className={`rounded-full px-3 py-1 font-semibold ${status?.price_prediction_enabled ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"}`}>
+                Price model {status?.price_prediction_enabled ? "ready" : "unavailable"}
+              </span>
             </div>
+
+            <div className="flex items-center gap-2 border-b border-[#e7e2d8] px-4 py-2">
+              <button type="button" onClick={() => setEstimateOpen((value) => !value)} aria-expanded={estimateOpen} className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-bold ${estimateOpen ? "bg-[#142536] text-white" : "bg-[#f3ead8] text-[#142536]"}`}>
+                <Calculator size={15} aria-hidden="true" /> {estimateOpen ? "Back to conversation" : "Price estimate"}
+              </button>
+              <a href="/price-prediction" className="text-xs font-semibold text-[#80602b] underline underline-offset-2">Open full predictor</a>
+            </div>
+
+            {estimateOpen && (
+              <section aria-label="Property price estimator" className="max-h-[48dvh] shrink-0 overflow-y-auto border-b border-[#e7e2d8] bg-[#f7f4ed] px-2 py-2">
+                <div className="pv-page !w-full !max-w-none !p-2">
+                  <p className="mb-3 rounded-xl bg-white px-3 py-2 text-xs leading-5 text-[#536272]">Fill the property details here, or ask the AI assistant for an estimate when AI setup is enabled. The model will read the result aloud.</p>
+                  <PropertyForm
+                    onSubmittingChange={setPriceSubmitting}
+                    onPrediction={onPricePrediction}
+                  />
+                  <PredictionCard prediction={pricePrediction} propertyData={pricePropertyData} loading={priceSubmitting} />
+                </div>
+              </section>
+            )}
 
             {status?.assistant_test_mode && (
               <p className="mx-4 mt-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm leading-5 text-amber-950">
@@ -209,7 +264,7 @@ export default function CrmVoiceAssistant() {
               ) : <p className="text-xs text-[#68717a]">{callsLoading ? "Checking for call activity…" : "Call activity appears here automatically."}</p>}
             </section>
 
-            <div className="min-h-40 flex-1 space-y-3 overflow-y-auto bg-[#f7f4ed] px-4 py-4" aria-live="polite">
+            {!estimateOpen && <div className="min-h-40 flex-1 space-y-3 overflow-y-auto bg-[#f7f4ed] px-4 py-4" aria-live="polite">
               {messages.map((message, index) => (
                 <p key={`${index}-${message.role}`} className={`w-fit max-w-[90%] whitespace-pre-wrap rounded-2xl px-4 py-3 text-sm leading-6 ${message.role === "user" ? "ml-auto bg-[#142536] text-white" : "bg-white text-[#142536] shadow-sm"}`}>
                   {message.content}
@@ -228,7 +283,7 @@ export default function CrmVoiceAssistant() {
               )}
               {busy && <p className="flex items-center gap-2 text-sm text-[#5e6872]"><Loader2 size={16} className="animate-spin" /> Working…</p>}
               <div ref={bottom} />
-            </div>
+            </div>}
 
             {error && <p role="alert" className="mx-4 mt-3 rounded-xl bg-rose-50 px-3 py-2 text-sm text-rose-800">{error}</p>}
             <form onSubmit={(event) => { event.preventDefault(); send(draft); }} className="flex items-center gap-2 border-t border-[#e7e2d8] p-3">
