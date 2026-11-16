@@ -12,6 +12,7 @@ import {
   LayoutDashboard,
   Phone,
   Settings,
+  UserRound,
   UsersRound,
   Video,
   X,
@@ -61,7 +62,9 @@ export default function AdminRail({ open, setOpen }) {
   if (pathname === "/admin" || pathname.startsWith("/admin/")) return null;
 
   const linkClass = ({ isActive }) =>
-    `flex min-h-11 items-center gap-3 rounded-xl px-3 py-2 text-sm font-semibold transition ${isActive ? "bg-[#f3ead8] text-[#142536]" : "text-white/80 hover:bg-white/10 hover:text-white"}`;
+    `group flex min-h-12 items-center gap-3 rounded-xl px-3 py-1.5 text-sm font-semibold transition ${
+      isActive ? "bg-white/10 text-white ring-1 ring-inset ring-white/10" : "text-white/80 hover:bg-white/10 hover:text-white"
+    }`;
 
   return (
     <>
@@ -82,35 +85,57 @@ export default function AdminRail({ open, setOpen }) {
               </button>
             </div>
 
-            <div className="grid grid-cols-2 gap-2 p-4">
-              <Link to="/price-prediction" onClick={() => setOpen(false)} className="flex min-h-[76px] flex-col justify-between rounded-2xl bg-[#c9a45c] p-3 text-[#142536] transition hover:bg-[#e1c98f]">
+            <div className="grid grid-cols-2 gap-2 p-4 lg:hidden">
+              <Link to="/price-prediction" onClick={() => setOpen(false)} className="flex min-h-[76px] flex-col justify-between rounded-2xl border border-[#e1c98f]/40 bg-[#c9a45c] p-3 text-[#142536] shadow-sm transition hover:-translate-y-0.5 hover:bg-[#e1c98f]">
                 <Calculator size={19} aria-hidden="true" />
                 <span className="text-xs font-bold">Estimate a price</span>
               </Link>
-              <Link to="/book-visit" onClick={() => setOpen(false)} className="flex min-h-[76px] flex-col justify-between rounded-2xl border border-white/15 bg-white/5 p-3 transition hover:bg-white/10">
+              <Link to="/book-visit" onClick={() => setOpen(false)} className="flex min-h-[76px] flex-col justify-between rounded-2xl border border-white/15 bg-white/5 p-3 shadow-sm transition hover:-translate-y-0.5 hover:border-[#e1c98f]/50 hover:bg-white/10">
                 <CalendarCheck size={19} className="text-[#e1c98f]" aria-hidden="true" />
                 <span className="text-xs font-bold">Book a visit</span>
               </Link>
             </div>
 
-            <div className="px-4 pb-4">
+            <div className="px-4 pb-4 lg:hidden">
               <Link
                 to="/account"
                 onClick={() => setOpen(false)}
-                className="flex min-h-11 items-center justify-center gap-2 rounded-full border border-white/20 px-4 py-2 text-sm font-bold text-white transition hover:border-[#e1c98f] hover:text-[#e1c98f]"
+                className="flex min-h-11 items-center justify-center gap-2 rounded-full border border-[#c9a45c]/50 bg-white/5 px-4 py-2 text-sm font-bold text-white transition hover:border-[#e1c98f] hover:bg-white/10 hover:text-[#e1c98f]"
               >
+                <UserRound size={17} aria-hidden="true" className="text-[#e1c98f]" />
                 Sign in / Sign up
               </Link>
             </div>
 
             <nav className="min-h-0 flex-1 overflow-y-auto px-3 pb-4" aria-label="Main menu">
               <p className="px-3 pb-2 pt-1 text-[10px] font-bold uppercase tracking-[.18em] text-[#e1c98f]">Explore Gratia Estates</p>
-              <ul className="space-y-1">
+              <ul className="space-y-1.5">
                 {PUBLIC_LINKS.map(({ to, label, Icon, end }) => (
                   <li key={to}>
-                    <NavLink to={to} end={end} onClick={() => setOpen(false)} className={linkClass}>
-                      <Icon size={17} className="shrink-0 text-[#e1c98f]" aria-hidden="true" />
-                      {label}
+                    <NavLink
+                      to={to}
+                      end={end}
+                      onClick={() => setOpen(false)}
+                      className={({ isActive }) =>
+                        `${linkClass({ isActive })} ${
+                          to === "/" || to === "/projects" ? "lg:hidden" : ""
+                        } ${to === "/about" || to === "/contact" ? "xl:hidden" : ""}`
+                      }
+                    >
+                      {({ isActive }) => (
+                        <>
+                          <span
+                            className={`grid size-9 shrink-0 place-items-center rounded-lg transition-colors ${
+                              isActive
+                                ? "bg-[#c9a45c] text-[#142536]"
+                                : "bg-white/5 text-[#e1c98f] group-hover:bg-white/10"
+                            }`}
+                          >
+                            <Icon size={17} aria-hidden="true" />
+                          </span>
+                          <span>{label}</span>
+                        </>
+                      )}
                     </NavLink>
                   </li>
                 ))}
@@ -124,22 +149,32 @@ export default function AdminRail({ open, setOpen }) {
                     {staffLinks.map(({ to, label, Icon, end }) => (
                       <li key={to}>
                         <NavLink to={to} end={end} onClick={() => setOpen(false)} className={linkClass}>
-                          <Icon size={17} className="shrink-0 text-[#e1c98f]" aria-hidden="true" />
-                          {label}
+                          {({ isActive }) => (
+                            <>
+                              <span className={`grid size-9 shrink-0 place-items-center rounded-lg ${isActive ? "bg-[#c9a45c] text-[#142536]" : "bg-white/5 text-[#e1c98f] group-hover:bg-white/10"}`}>
+                                <Icon size={17} aria-hidden="true" />
+                              </span>
+                              <span>{label}</span>
+                            </>
+                          )}
                         </NavLink>
                       </li>
                     ))}
                     <li>
-                      <Link to="/videos" onClick={() => setOpen(false)} className={linkClass}>
-                        <Video size={17} className="shrink-0 text-[#e1c98f]" aria-hidden="true" />
-                        Manage video library
+                      <Link to="/videos" onClick={() => setOpen(false)} className="group flex min-h-12 items-center gap-3 rounded-xl px-3 py-1.5 text-sm font-semibold text-white/80 transition hover:bg-white/10 hover:text-white">
+                        <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-white/5 text-[#e1c98f] group-hover:bg-white/10">
+                          <Video size={17} aria-hidden="true" />
+                        </span>
+                        <span>Manage video library</span>
                       </Link>
                     </li>
                   </ul>
                 </>
               ) : (
-                <Link to="/admin" onClick={() => setOpen(false)} className="flex min-h-11 items-center gap-3 rounded-xl border border-[#c9a45c]/50 bg-white/5 px-3 py-2 text-sm font-semibold text-white transition hover:bg-white/10">
-                  <LayoutDashboard size={17} className="text-[#e1c98f]" aria-hidden="true" />
+                <Link to="/admin" onClick={() => setOpen(false)} className="group flex min-h-12 items-center gap-3 rounded-xl border border-[#c9a45c]/50 bg-white/5 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-white/10">
+                  <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-white/5 text-[#e1c98f] group-hover:bg-white/10">
+                    <LayoutDashboard size={17} aria-hidden="true" />
+                  </span>
                   Admin sign in
                 </Link>
               )}

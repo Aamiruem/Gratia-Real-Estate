@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
-import { Building2, CalendarCheck, ChevronDown, Home, LogIn, Menu, UserPlus, UserRound } from "lucide-react";
+import { Building2, CalendarCheck, ChevronDown, ContactRound, Home, LogIn, Menu, UserPlus, UserRound, UsersRound } from "lucide-react";
 import Logo from "./Logo";
 import SiteSearch from "./SiteSearch";
 import NotificationBell from "./notifications/NotificationBell";
@@ -95,7 +95,7 @@ export default function Header({ menuOpen, onMenuOpen }) {
                   }`
                 }
               >
-                <Home size={17} aria-hidden="true" />
+                <Home size={17} aria-hidden="true" className="text-[#80602b]" />
                 Home
               </NavLink>
               <div
@@ -117,7 +117,7 @@ export default function Header({ menuOpen, onMenuOpen }) {
                     pathname.startsWith("/projects") ? "bg-[#142536] text-white" : "text-[#142536] hover:bg-[#f3ead8]"
                   }`}
                 >
-                  <Building2 size={17} aria-hidden="true" />
+                  <Building2 size={17} aria-hidden="true" className={pathname.startsWith("/projects") ? "text-[#e1c98f]" : "text-[#80602b]"} />
                   Properties
                   <ChevronDown size={15} aria-hidden="true" className={`transition-transform ${propertiesOpen ? "rotate-180" : ""}`} />
                 </button>
@@ -168,6 +168,28 @@ export default function Header({ menuOpen, onMenuOpen }) {
                   </div>
                 )}
               </div>
+              <NavLink
+                to="/about"
+                className={({ isActive }) =>
+                  `hidden h-11 items-center gap-2 rounded-full px-3 text-sm font-semibold transition xl:inline-flex ${
+                    isActive ? "bg-[#142536] text-white" : "text-[#142536] hover:bg-[#f3ead8]"
+                  }`
+                }
+              >
+                <UsersRound size={17} aria-hidden="true" className="text-[#80602b]" />
+                About
+              </NavLink>
+              <NavLink
+                to="/contact"
+                className={({ isActive }) =>
+                  `hidden h-11 items-center gap-2 rounded-full px-3 text-sm font-semibold transition xl:inline-flex ${
+                    isActive ? "bg-[#142536] text-white" : "text-[#142536] hover:bg-[#f3ead8]"
+                  }`
+                }
+              >
+                <ContactRound size={17} aria-hidden="true" className="text-[#80602b]" />
+                Contact
+              </NavLink>
             </nav>
 
             <div className="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-2">
