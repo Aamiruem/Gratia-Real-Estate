@@ -2,12 +2,14 @@ import logging
 import os
 import re
 import secrets
+import hashlib
+import hmac
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from jwt import InvalidTokenError as JWTError
 from pydantic import BaseModel, EmailStr, Field
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -17,6 +19,8 @@ from ..database import get_db
 from ..delivery.sms import to_e164
 from ..dependencies import ACCESS_COOKIE, REFRESH_COOKIE, get_current_user
 from ..models import (
+    CustomerOtpRateLimit,
+    CustomerSignupChallenge,
     EmailChangeChallenge,
     LoginChallenge,
     User,
@@ -30,6 +34,7 @@ from ..security import (
     create_refresh_token,
     decode_claims,
     hash_password,
+    JWT_SECRET_KEY,
     token_is_current,
 )
 
@@ -282,6 +287,85 @@ def _require_customer_sms() -> None:
         raise HTTPException(status_code=503, detail="Phone OTP sign-in is not configured.")
 
 
+def _phone_digest(phone: str) -> str:
+    return hmac.new(
+        JWT_SECRET_KEY.encode(),
+        f"customer-otp:{phone}".encode(),
+        hashlib.sha256,
+    ).hexdigest()
+
+
+def _consume_customer_sms_budget(db: Session, phone: str) -> None:
+    now = datetime.now(timezone.utc)
+    hour_ago = now - timedelta(hours=1)
+    db.execute(delete(CustomerOtpRateLimit).where(CustomerOtpRateLimit.requested_at < now - timedelta(days=1)))
+    phone_hash = _phone_digest(phone)
+    phone_count = db.scalar(
+        select(func.count(CustomerOtpRateLimit.id)).where(
+            CustomerOtpRateLimit.phone_hash == phone_hash,
+            CustomerOtpRateLimit.requested_at >= hour_ago,
+        )
+    ) or 0
+    global_count = db.scalar(
+        select(func.count(CustomerOtpRateLimit.id)).where(CustomerOtpRateLimit.requested_at >= hour_ago)
+    ) or 0
+    if phone_count >= 3:
+        db.rollback()
+        raise HTTPException(status_code=429, detail="Too many codes requested for this number. Try again later.")
+    if global_count >= 100:
+        db.rollback()
+        raise HTTPException(status_code=429, detail="Phone sign-in is temporarily busy. Please try again later.")
+    db.add(CustomerOtpRateLimit(phone_hash=phone_hash))
+    db.commit()
+
+
+def _send_customer_signup_code(
+    name: str,
+    email: str,
+    phone: str,
+    request: Request,
+    db: Session,
+) -> dict:
+    _consume_customer_sms_budget(db, phone)
+    challenge_id = "signup_" + secrets.token_urlsafe(32)
+    code = otp.new_code()
+    now = datetime.now(timezone.utc)
+    challenge = CustomerSignupChallenge(
+        id=challenge_id,
+        name=name,
+        email=email,
+        phone_number=phone,
+        code_hash=otp.hash_code(challenge_id, code),
+        expires_at=now + timedelta(minutes=otp.CODE_TTL_MINUTES),
+        sent_at=now,
+    )
+    db.add(challenge)
+    db.flush()
+    try:
+        delivered_via = otp.send_sms_code(phone, code, "sign-up")
+    except Exception as error:
+        logger.exception("Could not send the customer verification code")
+        db.rollback()
+        reason = str(error) if isinstance(error, otp.DeliveryError) else "The delivery service failed."
+        raise HTTPException(
+            status_code=502,
+            detail=f"We couldn't send your verification code. {reason} Please try again shortly.",
+        )
+    db.commit()
+    reply = {
+        "otp_required": True,
+        "challenge_id": challenge_id,
+        "sent_to": otp.mask_phone(phone),
+        "channel": "phone",
+        "delivered_via": delivered_via,
+        "expires_in_minutes": otp.CODE_TTL_MINUTES,
+        "resend_after_seconds": otp.RESEND_AFTER_SECONDS,
+    }
+    if _is_local_request(request) and delivered_via == "log":
+        reply["local_code"] = code
+    return reply
+
+
 @router.post("/customer/phone/login")
 def customer_phone_login(
     data: CustomerPhoneRequest,
@@ -296,6 +380,7 @@ def customer_phone_login(
         raise HTTPException(status_code=404, detail="No account found for this number. Please sign up first.")
     if not user.is_active:
         raise HTTPException(status_code=403, detail="User account is inactive.")
+    _consume_customer_sms_budget(db, phone)
     _enforce_cooldown(user, db)
     return _issue_challenge(user, db, channel="phone", show_code=_is_local_request(request))
 
@@ -306,31 +391,134 @@ def customer_phone_signup(
     request: Request,
     db: Session = Depends(get_db),
 ):
-    """Create a public customer account and verify its phone number by OTP."""
+    """Verify signup details by SMS before creating a public customer account."""
     _require_customer_sms()
     phone = _normalized_phone(data.phone)
     email = str(data.email).strip().lower()
+    name = data.name.strip()
+    if not name:
+        raise HTTPException(status_code=422, detail="Enter your name.")
     if db.scalar(select(User.id).where(User.phone_number == phone)):
         raise HTTPException(status_code=409, detail="This phone number is already registered. Please sign in.")
     if db.scalar(select(User.id).where(func.lower(User.email) == email)):
         raise HTTPException(status_code=409, detail="This email is already registered. Please sign in.")
+    now = datetime.now(timezone.utc)
+    db.execute(delete(CustomerSignupChallenge).where(CustomerSignupChallenge.expires_at <= now))
+    pending_signup = db.scalar(
+        select(CustomerSignupChallenge).where(
+            or_(CustomerSignupChallenge.phone_number == phone, func.lower(CustomerSignupChallenge.email) == email)
+        )
+    )
+    if pending_signup:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="A sign-up verification is already pending for these details.")
+    db.commit()
+    return _send_customer_signup_code(name, email, phone, request, db)
 
+
+class CustomerSignupVerifyRequest(BaseModel):
+    challenge_id: str = Field(min_length=10, max_length=64)
+    code: str = Field(pattern=r"^\d{6}$")
+
+
+def _get_customer_signup_challenge(challenge_id: str, db: Session) -> CustomerSignupChallenge:
+    challenge = db.get(CustomerSignupChallenge, challenge_id)
+    if challenge is None:
+        raise HTTPException(status_code=400, detail="This sign-up code has expired. Please start again.")
+    expires_at = challenge.expires_at
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    if expires_at < datetime.now(timezone.utc):
+        db.delete(challenge)
+        db.commit()
+        raise HTTPException(status_code=400, detail="This sign-up code has expired. Please start again.")
+    return challenge
+
+
+@router.post("/customer/phone/verify", response_model=AuthResponse)
+def customer_phone_signup_verify(
+    data: CustomerSignupVerifyRequest,
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_db),
+):
+    challenge = _get_customer_signup_challenge(data.challenge_id, db)
+    if not otp.codes_match(challenge.code_hash, challenge.id, data.code):
+        challenge.attempts += 1
+        if challenge.attempts >= otp.MAX_ATTEMPTS:
+            db.delete(challenge)
+            db.commit()
+            raise HTTPException(status_code=429, detail="Too many incorrect codes. Please sign up again.")
+        db.commit()
+        remaining = otp.MAX_ATTEMPTS - challenge.attempts
+        raise HTTPException(
+            status_code=401,
+            detail=f"That code isn't right. {remaining} {'try' if remaining == 1 else 'tries'} left.",
+        )
+
+    if db.scalar(select(User.id).where(or_(User.phone_number == challenge.phone_number, func.lower(User.email) == challenge.email))):
+        db.delete(challenge)
+        db.commit()
+        raise HTTPException(status_code=409, detail="An account already exists with these details. Please sign in.")
     user = User(
-        name=data.name.strip(),
-        email=email,
-        phone_number=phone,
+        name=challenge.name,
+        email=challenge.email,
+        phone_number=challenge.phone_number,
         password_hash=hash_password(secrets.token_urlsafe(32)),
         role="user",
     )
-    if not user.name:
-        raise HTTPException(status_code=422, detail="Enter your name.")
     db.add(user)
+    db.delete(challenge)
     try:
-        db.flush()
+        db.commit()
     except IntegrityError:
         db.rollback()
-        raise HTTPException(status_code=409, detail="An account already exists with this email or phone number.")
-    return _issue_challenge(user, db, channel="phone", show_code=_is_local_request(request))
+        raise HTTPException(status_code=409, detail="An account already exists with these details. Please sign in.")
+    db.refresh(user)
+    return _complete_login(user, response, request)
+
+
+@router.post("/customer/phone/resend")
+def customer_phone_signup_resend(
+    data: OtpResendRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    _require_customer_sms()
+    challenge = _get_customer_signup_challenge(data.challenge_id, db)
+    sent_at = challenge.sent_at if challenge.sent_at.tzinfo else challenge.sent_at.replace(tzinfo=timezone.utc)
+    wait = otp.RESEND_AFTER_SECONDS - (datetime.now(timezone.utc) - sent_at).total_seconds()
+    if wait > 0:
+        raise HTTPException(status_code=429, detail=f"Please wait {int(wait) + 1} seconds before requesting a new code.")
+    _consume_customer_sms_budget(db, challenge.phone_number)
+    code = otp.new_code()
+    challenge.code_hash = otp.hash_code(challenge.id, code)
+    challenge.attempts = 0
+    challenge.sent_at = datetime.now(timezone.utc)
+    challenge.expires_at = challenge.sent_at + timedelta(minutes=otp.CODE_TTL_MINUTES)
+    try:
+        delivered_via = otp.send_sms_code(challenge.phone_number, code, "sign-up")
+    except Exception as error:
+        logger.exception("Could not resend the customer verification code")
+        db.rollback()
+        reason = str(error) if isinstance(error, otp.DeliveryError) else "The delivery service failed."
+        raise HTTPException(
+            status_code=502,
+            detail=f"We couldn't send your verification code. {reason} Please try again shortly.",
+        )
+    db.commit()
+    reply = {
+        "otp_required": True,
+        "challenge_id": challenge.id,
+        "sent_to": otp.mask_phone(challenge.phone_number),
+        "channel": "phone",
+        "delivered_via": delivered_via,
+        "expires_in_minutes": otp.CODE_TTL_MINUTES,
+        "resend_after_seconds": otp.RESEND_AFTER_SECONDS,
+    }
+    if _is_local_request(request) and delivered_via == "log":
+        reply["local_code"] = code
+    return reply
 
 
 def _verify_google_credential(credential: str) -> dict:

@@ -95,6 +95,40 @@ class LoginChallenge(Base):
     )
 
 
+class CustomerSignupChallenge(Base):
+    """Temporary signup details and OTP; no customer account exists until verified."""
+
+    __tablename__ = "customer_signup_challenges"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    email: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    phone_number: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
+    code_hash: Mapped[str] = mapped_column(String(128), nullable=False)
+    attempts: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    sent_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+
+class CustomerOtpRateLimit(Base):
+    """Short-lived HMAC phone digests used to cap public SMS sends."""
+
+    __tablename__ = "customer_otp_rate_limits"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    phone_hash: Mapped[str] = mapped_column(String(64), index=True, nullable=False)
+    requested_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        index=True,
+        nullable=False,
+    )
+
+
 class EmailChangeChallenge(Base):
     __tablename__ = "email_change_challenges"
 

@@ -10,6 +10,8 @@ import useOwner from "../hooks/useOwner";
 import { projects } from "../data/projects";
 import { usePropertiesVersion } from "../data/liveProperties";
 
+const FEATURED_PROJECTS = ["Roots Courtyard", "Bestech"];
+
 /** Keep the header focused on the brand and a single menu trigger. */
 export default function Header({ menuOpen, onMenuOpen }) {
   const [propertiesOpen, setPropertiesOpen] = useState(false);
@@ -35,6 +37,13 @@ export default function Header({ menuOpen, onMenuOpen }) {
   }, [propertiesOpen]);
 
   const sortedProjects = [...projects].sort((a, b) => a.name.localeCompare(b.name));
+  const featuredProjectLinks = FEATURED_PROJECTS.map((name) => {
+    const project = sortedProjects.find((item) => item.name.toLowerCase().includes(name.toLowerCase()));
+    return {
+      name,
+      to: project ? `/projects/${project.slug}` : `/projects?q=${encodeURIComponent(name)}#results`,
+    };
+  });
 
   return (
     <>
@@ -70,10 +79,19 @@ export default function Header({ menuOpen, onMenuOpen }) {
                 <Home size={17} aria-hidden="true" />
                 Home
               </NavLink>
-              <div ref={propertiesMenuRef} className="relative">
+              <div
+                ref={propertiesMenuRef}
+                className="relative"
+                onMouseEnter={() => setPropertiesOpen(true)}
+                onMouseLeave={() => setPropertiesOpen(false)}
+                onBlur={(event) => {
+                  if (!event.currentTarget.contains(event.relatedTarget)) setPropertiesOpen(false);
+                }}
+              >
                 <button
                   type="button"
-                  onClick={() => setPropertiesOpen((open) => !open)}
+                  onClick={() => setPropertiesOpen(true)}
+                  onFocus={() => setPropertiesOpen(true)}
                   aria-expanded={propertiesOpen}
                   aria-controls="header-properties-menu"
                   className={`inline-flex h-11 items-center gap-2 rounded-full px-3 text-sm font-semibold transition ${
@@ -87,30 +105,47 @@ export default function Header({ menuOpen, onMenuOpen }) {
                 {propertiesOpen && (
                   <div
                     id="header-properties-menu"
-                    className="absolute left-0 top-[calc(100%+10px)] z-[70] w-[min(360px,calc(100vw-32px))] overflow-hidden rounded-2xl border border-[#e7e2d8] bg-white shadow-[0_20px_50px_rgba(13,27,42,.2)]"
+                    className="absolute left-0 top-full z-[70] w-[min(360px,calc(100vw-32px))] pt-2"
                   >
-                    <Link
-                      to="/projects"
-                      onClick={() => setPropertiesOpen(false)}
-                      className="flex items-center justify-between border-b border-[#efebe3] bg-[#fbfaf7] px-4 py-3 text-sm font-bold text-[#142536] transition hover:bg-[#f3ead8]"
-                    >
-                      All Gurgaon &amp; NCR projects
-                      <span className="text-xs font-semibold text-[#80602b]">{projects.length}</span>
-                    </Link>
-                    <ul className="max-h-[min(65vh,480px)] overflow-y-auto p-2">
-                      {sortedProjects.map((project) => (
-                        <li key={project.slug}>
+                    <div className="overflow-hidden rounded-2xl border border-[#e7e2d8] bg-white shadow-[0_20px_50px_rgba(13,27,42,.2)]">
+                      <Link
+                        to="/projects"
+                        onClick={() => setPropertiesOpen(false)}
+                        className="flex items-center justify-between border-b border-[#efebe3] bg-[#fbfaf7] px-4 py-3 text-sm font-bold text-[#142536] transition-colors hover:bg-[#f3ead8]"
+                      >
+                        All Gurgaon &amp; NCR projects
+                        <span className="text-xs font-semibold text-[#80602b]">{projects.length}</span>
+                      </Link>
+                      <div className="border-b border-[#efebe3] px-3 py-2">
+                        <p className="px-1 pb-1 text-[10px] font-bold uppercase tracking-[.14em] text-[#80602b]">Popular projects</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {featuredProjectLinks.map(({ name, to }) => (
+                            <Link
+                              key={name}
+                              to={to}
+                              onClick={() => setPropertiesOpen(false)}
+                              className="rounded-full border border-[#e7e2d8] px-3 py-1.5 text-xs font-semibold text-[#142536] transition-colors hover:border-[#c9a45c] hover:bg-[#f3ead8] hover:text-[#80602b]"
+                            >
+                              {name}
+                            </Link>
+                          ))}
+                        </div>
+                      </div>
+                      <ul className="max-h-[min(55vh,400px)] overflow-y-auto p-2">
+                        {sortedProjects.map((project) => (
+                          <li key={project.slug}>
                           <Link
                             to={`/projects/${project.slug}`}
                             onClick={() => setPropertiesOpen(false)}
-                            className="block rounded-xl px-3 py-2.5 transition hover:bg-[#f3ead8]"
+                            className="block rounded-xl px-3 py-2.5 transition-colors hover:bg-[#f3ead8] hover:text-[#80602b]"
                           >
                             <span className="block text-sm font-semibold text-[#142536]">{project.name}</span>
                             <span className="mt-0.5 block text-xs text-[#68717a]">{project.location}</span>
                           </Link>
-                        </li>
-                      ))}
-                    </ul>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
                   </div>
                 )}
               </div>

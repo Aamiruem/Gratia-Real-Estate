@@ -42,6 +42,8 @@ def get_db():
 def create_tables():
     from .models import (  # noqa: F401
         AnalyticsEvent,
+        CustomerOtpRateLimit,
+        CustomerSignupChallenge,
         AuditLog,
         EmailChangeChallenge,
         FollowUp,
