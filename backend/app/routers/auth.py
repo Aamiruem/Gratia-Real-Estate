@@ -1,9 +1,9 @@
+import hashlib
+import hmac
 import logging
 import os
 import re
 import secrets
-import hashlib
-import hmac
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
@@ -288,6 +288,8 @@ def _require_customer_sms() -> None:
 
 
 def _phone_digest(phone: str) -> str:
+    if not JWT_SECRET_KEY:
+        raise RuntimeError("JWT_SECRET_KEY is unavailable for OTP rate limiting.")
     return hmac.new(
         JWT_SECRET_KEY.encode(),
         f"customer-otp:{phone}".encode(),

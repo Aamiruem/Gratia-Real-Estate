@@ -80,6 +80,32 @@ def test_customer_sms_budget_limits_repeated_phone_requests(client, outbox, monk
     assert outbox == []
 
 
+def test_customer_sms_budget_caps_requests_across_distinct_numbers(client, outbox, monkeypatch):
+    monkeypatch.setattr(otp, "phone_delivery_available", lambda: True)
+    with SessionLocal() as db:
+        db.add_all(
+            [
+                CustomerOtpRateLimit(
+                    phone_hash=f"test-phone-{index}",
+                    requested_at=datetime.now(timezone.utc),
+                )
+                for index in range(100)
+            ]
+        )
+        db.commit()
+
+    response = client.post(
+        "/auth/customer/phone/signup",
+        json={
+            "name": "Visitor",
+            "email": "global-limit@example.com",
+            "phone": "+91 90000 00004",
+        },
+    )
+    assert response.status_code == 429
+    assert outbox == []
+
+
 def test_phone_login_requires_an_existing_customer_account(client, monkeypatch):
     monkeypatch.setattr(otp, "phone_delivery_available", lambda: True)
     response = client.post("/auth/customer/phone/login", json={"phone": "+91 90000 00001"})
