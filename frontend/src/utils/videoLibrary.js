@@ -161,6 +161,9 @@ function normalizeVideo(video) {
     url: video.url,
     description: video.description || "",
     projectSlug: video.project_slug || "",
+    source: video.source || "",
+    channel: video.channel || "",
+    thumbnailUrl: video.thumbnail_url || "",
   };
 }
 
@@ -170,6 +173,21 @@ export async function fetchVideos() {
     return { videos: data.map(normalizeVideo), error: "" };
   } catch (error) {
     return { videos: [], error: error.message };
+  }
+}
+
+export async function fetchInstagramVideos(after = "") {
+  try {
+    const query = after ? `?after=${encodeURIComponent(after)}` : "";
+    const data = await apiRequest(`/instagram/videos${query}`);
+    return {
+      configured: data.configured === true,
+      videos: (data.videos || []).map(normalizeVideo),
+      nextCursor: data.next_cursor || "",
+      error: "",
+    };
+  } catch (error) {
+    return { configured: false, videos: [], nextCursor: "", error: error.message };
   }
 }
 

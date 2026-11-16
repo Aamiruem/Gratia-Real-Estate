@@ -51,6 +51,15 @@ services:
         value: en
       - key: WHATSAPP_TEMPLATE_BUTTON
         value: "true"
+      # Instagram professional-account video feed; the token stays server-side.
+      - key: INSTAGRAM_ACCESS_TOKEN
+        sync: false
+      - key: INSTAGRAM_USER_ID
+        sync: false
+      - key: INSTAGRAM_API_HOST
+        value: graph.facebook.com
+      - key: INSTAGRAM_API_VERSION
+        value: v27.0
       # Public site address (links in owner alerts) and CORS for direct calls.
       - key: PUBLIC_SITE_URL
         value: https://www.gratiaestates.com

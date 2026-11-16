@@ -46,6 +46,15 @@ const compact = (n) =>
 // Who published a video. Library videos come from the RootsDevelopers channel;
 // anything else is shown as curated by Gratia Estates.
 export function videoChannel(video) {
+  if (video?.channel) {
+    return {
+      name: video.channel,
+      initial: video.channel.replace(/^@/, "").charAt(0).toUpperCase() || "I",
+      tone: video.source === "instagram"
+        ? "bg-gradient-to-br from-amber-400 via-rose-500 to-purple-600"
+        : "bg-[#142536]",
+    };
+  }
   const text = `${video?.title ?? ""} ${video?.description ?? ""} ${video?.channel ?? ""}`;
   return /roots|courtyard/i.test(text)
     ? { name: "RootsDevelopers", initial: "R", tone: "bg-emerald-600" }

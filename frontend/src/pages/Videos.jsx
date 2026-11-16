@@ -2,6 +2,8 @@ import {
   ArrowRight,
   CalendarCheck,
   ClipboardList,
+  ExternalLink,
+  Instagram,
   LayoutGrid,
   MapPin,
   MessageCircle,
@@ -26,6 +28,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { authApi } from "../services/authApi";
 import {
   deleteUploadedVideo,
+  fetchInstagramVideos,
   fetchVideos,
   getVideoKey,
   getVideoSource,
@@ -130,6 +133,11 @@ export default function Videos() {
   const [searchParams] = useSearchParams();
   const requestedProjectSlug = searchParams.get("project") || "";
   const [videos, setVideos] = useState([]);
+  const [instagramVideos, setInstagramVideos] = useState([]);
+  const [instagramConfigured, setInstagramConfigured] = useState(false);
+  const [instagramNextCursor, setInstagramNextCursor] = useState("");
+  const [instagramLoading, setInstagramLoading] = useState(true);
+  const [instagramError, setInstagramError] = useState("");
   // Owner editor dialog: { video (null = new), focus: "title" | "url" }
   const [editor, setEditor] = useState(null);
   const [error, setError] = useState("");
@@ -154,6 +162,18 @@ export default function Videos() {
       }
     };
     loadVideos();
+    fetchInstagramVideos().then((result) => {
+      if (!active) return;
+      if (result.error) {
+        console.error("Instagram videos could not be loaded.", result.error);
+        setInstagramError("Instagram videos are temporarily unavailable.");
+      } else {
+        setInstagramConfigured(result.configured);
+        setInstagramVideos(result.videos);
+        setInstagramNextCursor(result.nextCursor);
+      }
+      setInstagramLoading(false);
+    });
     authApi
       .restoreSession()
       .then((result) => {
@@ -177,6 +197,21 @@ export default function Videos() {
       active = false;
     };
   }, []);
+
+  const loadMoreInstagramVideos = async () => {
+    if (!instagramNextCursor || instagramLoading) return;
+    setInstagramLoading(true);
+    const result = await fetchInstagramVideos(instagramNextCursor);
+    if (result.error) {
+      console.error("More Instagram videos could not be loaded.", result.error);
+      setInstagramError("More Instagram videos could not be loaded. Please try again.");
+    } else {
+      setInstagramVideos((current) => [...current, ...result.videos]);
+      setInstagramNextCursor(result.nextCursor);
+      setInstagramError("");
+    }
+    setInstagramLoading(false);
+  };
 
   useEffect(() => {
     if (
@@ -376,7 +411,7 @@ export default function Videos() {
 
             <ul className="mt-7 flex flex-wrap gap-3">
               {[
-                { value: videos.length || "—", label: "Videos" },
+                { value: videos.length + instagramVideos.length || "—", label: "Videos" },
                 { value: "HD", label: "Quality" },
                 { value: new Set(videos.map((v) => v.projectSlug).filter(Boolean)).size || projects.length, label: "Projects covered" },
               ].map(({ value, label }) => (
@@ -585,6 +620,86 @@ export default function Videos() {
               </div>
             )
           )}
+
+          <section className="order-2 mt-14 border-t border-[#e7e2d8] pt-10" aria-labelledby="instagram-videos-heading">
+            <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <h2 id="instagram-videos-heading" className="font-display text-2xl font-semibold text-[#142536]">
+                  Instagram videos
+                </h2>
+                <p className="mt-1 text-sm text-[#68717a]">Reels and videos from @manishpurwar007</p>
+              </div>
+              <a
+                href="https://www.instagram.com/manishpurwar007/"
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex min-h-10 items-center gap-2 rounded-full border border-[#e7e2d8] px-4 py-2 text-sm font-semibold text-[#142536] transition hover:border-rose-300 hover:text-rose-600"
+              >
+                <Instagram size={16} aria-hidden="true" /> View profile <ExternalLink size={14} aria-hidden="true" />
+              </a>
+            </div>
+
+            {instagramError && (
+              <p role="alert" className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                {instagramError}{" "}
+                <a className="font-semibold underline" href="https://www.instagram.com/manishpurwar007/" target="_blank" rel="noreferrer">
+                  View the Instagram profile
+                </a>
+                .
+              </p>
+            )}
+
+            {instagramVideos.length > 0 ? (
+              <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
+                {instagramVideos.map((video) => {
+                  const videoKey = getVideoKey(video.url);
+                  return (
+                    <article key={video.id} className="overflow-hidden rounded-2xl border border-[#e7e2d8] bg-white shadow-[0_12px_35px_rgba(20,37,54,.08)]">
+                      <div className="aspect-video bg-[#142536]">
+                        <VideoPreview
+                          video={video}
+                          overlay={{ label: "Instagram", title: video.title, channel: videoChannel(video).name, compact: true }}
+                        />
+                      </div>
+                      <div className="space-y-3 p-5">
+                        <VideoInfo video={video} compactLayout />
+                        {videoKey && <VideoActions videoId={videoKey} url={video.url} title={video.title} compactLayout />}
+                        {video.description && (
+                          <p className="line-clamp-4 text-sm leading-6 text-[#5e6872]">{video.description}</p>
+                        )}
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            ) : (
+              !instagramLoading && !instagramError && (
+                <p className="rounded-2xl border border-dashed border-[#d9dce0] bg-[#fbfaf7] px-5 py-8 text-center text-sm text-[#68717a]">
+                  {instagramConfigured
+                    ? "No Instagram videos were found."
+                    : "The Instagram video feed is not connected yet. Visit the profile to watch its videos."}
+                </p>
+              )
+            )}
+
+            {instagramLoading && (
+              <p role="status" className="mt-5 text-center text-sm text-[#68717a]">
+                Loading Instagram videos…
+              </p>
+            )}
+            {instagramNextCursor && (
+              <div className="mt-8 text-center">
+                <button
+                  type="button"
+                  onClick={loadMoreInstagramVideos}
+                  disabled={instagramLoading}
+                  className="inline-flex min-h-11 items-center gap-2 rounded-full bg-[#142536] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#263f55] disabled:cursor-wait disabled:opacity-60"
+                >
+                  {instagramLoading ? "Loading…" : instagramError ? "Retry loading Instagram videos" : "Load more Instagram videos"}
+                </button>
+              </div>
+            )}
+          </section>
         </div>
       </section>
 

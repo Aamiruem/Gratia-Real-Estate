@@ -49,6 +49,16 @@ export default function VideoPreview({ video, videoId, showLogo = true, overlay 
           className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-105"
         />
       )}
+      {source.type === "instagram" && video?.thumbnailUrl && !thumbnailFailed && (
+        <img
+          src={video.thumbnailUrl}
+          alt=""
+          loading="lazy"
+          referrerPolicy="no-referrer"
+          onError={() => setThumbnailFailed(true)}
+          className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-105"
+        />
+      )}
       {source.type === "file" && (
         // Shows a real frame from the video as its preview image.
         <video

@@ -45,6 +45,7 @@ from .routers.push import router as push_router
 from .routers.leads import router as leads_router
 from .routers.notifications import router as notifications_router
 from .routers.reactions import router as reactions_router
+from .routers.instagram import router as instagram_router
 from .routers.users import router as users_router
 from .routers.videos import router as videos_router
 from .seed import seed_sample_videos
@@ -151,6 +152,7 @@ app.include_router(auth_router)
 app.include_router(password_auth_router)
 app.include_router(users_router)
 app.include_router(videos_router)
+app.include_router(instagram_router)
 app.include_router(reactions_router)
 app.include_router(leads_router)
 app.include_router(notifications_router)

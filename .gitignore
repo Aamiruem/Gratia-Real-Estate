@@ -1,4 +1,4 @@
 ﻿deploy/.env
-
+.tsupgrader/
 .vercel
 .env*

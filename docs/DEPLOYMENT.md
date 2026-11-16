@@ -60,12 +60,21 @@ copied into the `properties` table the first time.
 | `FAST2SMS_API_KEY` | SMS OTP delivery for Indian mobile numbers |
 | `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_ACCESS_TOKEN` | Meta WhatsApp Business API credentials |
 | `WHATSAPP_OTP_TEMPLATE`, `WHATSAPP_TEMPLATE_LANG` | approved authentication template name and exact language |
+| `INSTAGRAM_ACCESS_TOKEN`, `INSTAGRAM_USER_ID` | Instagram professional-account API token and account ID; keep both in backend secrets |
+| `INSTAGRAM_API_HOST`, `INSTAGRAM_API_VERSION` | API host/version; current Unified Login defaults are `graph.facebook.com` and `v27.0` |
 | `NTFY_TOPIC` | optional: phone alert for every new lead (ntfy app) |
 | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | optional: browser push. Generate with `cd backend && python -m app.push` |
 | `OPENAI_API_KEY` | optional: AI chat assistant (OpenAI API key, billed per use) |
 | `VERCEL_DEPLOY_HOOK_URL` | optional: rebuilds the sitemap when listings change (see step 3.5) |
 
 `COOKIE_SECURE=true`, `OTP_CONSOLE_FALLBACK=false`, JWT secrets, `PUBLIC_SITE_URL` and `FRONTEND_ORIGINS` are set by the blueprint. Save the environment changes and redeploy the backend.
+
+The Instagram feed requires an Instagram professional (business or creator)
+account shared with a Meta app that has `instagram_basic` access. For Unified
+Login, use the Instagram account ID returned by `/me/assigned_instagram_accounts`
+and the app's business integration access token. Keep the token only in the
+backend environment; never put it in frontend variables or source control. The
+Videos page loads posts in pages and embeds Instagram's own video/Reel player.
 
 4. Deploy, then open `https://<your-api>.onrender.com/health` → `{"status":"ok","database":"ok"}`.
 
