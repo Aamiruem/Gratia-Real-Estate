@@ -30,7 +30,9 @@ export default async function handler(req, res) {
   const incoming = new URL(req.url, "http://placeholder");
   const path = (incoming.searchParams.get("__path") || "").replace(/^\/+/, "");
   let body = req.body;
+  let rawBody;
   if (typeof body === "string" || Buffer.isBuffer(body)) {
+    rawBody = body;
     try {
       body = JSON.parse(Buffer.isBuffer(body) ? body.toString("utf8") : body);
     } catch {
@@ -38,11 +40,13 @@ export default async function handler(req, res) {
     }
   }
   if ((!body || typeof body !== "object") && req.method !== "GET" && req.method !== "HEAD") {
-    const rawBody = await readBody(req);
-    try {
-      body = JSON.parse(Buffer.isBuffer(rawBody) ? rawBody.toString("utf8") : String(rawBody || ""));
-    } catch {
-      body = null;
+    rawBody ||= await readBody(req);
+    if (rawBody) {
+      try {
+        body = JSON.parse(Buffer.isBuffer(rawBody) ? rawBody.toString("utf8") : String(rawBody));
+      } catch {
+        body = null;
+      }
     }
   }
 
@@ -84,13 +88,16 @@ export default async function handler(req, res) {
   }
   headers["x-forwarded-host"] = req.headers.host || "";
   headers["x-forwarded-proto"] = "https";
+  const requestBody = req.method === "GET" || req.method === "HEAD"
+    ? undefined
+    : rawBody ?? (body && typeof body === "object" ? JSON.stringify(body) : undefined);
 
   let upstream;
   try {
     upstream = await fetch(target, {
       method: req.method,
       headers,
-      body: await readBody(req),
+      body: requestBody,
       redirect: "manual",
       signal: AbortSignal.timeout(25_000),
     });
