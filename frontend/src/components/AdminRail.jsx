@@ -14,7 +14,6 @@ import {
   Settings,
   UserRound,
   UsersRound,
-  Video,
   X,
 } from "lucide-react";
 import useOwner from "../hooks/useOwner";
@@ -119,7 +118,7 @@ export default function AdminRail({ open, setOpen }) {
                       className={({ isActive }) =>
                         `${linkClass({ isActive })} ${
                           to === "/" || to === "/projects" ? "lg:hidden" : ""
-                        } ${to === "/about" || to === "/contact" ? "xl:hidden" : ""}`
+                        } ${to === "/about" || to === "/contact" || to === "/videos" ? "xl:hidden" : ""}`
                       }
                     >
                       {({ isActive }) => (
@@ -160,14 +159,6 @@ export default function AdminRail({ open, setOpen }) {
                         </NavLink>
                       </li>
                     ))}
-                    <li>
-                      <Link to="/videos" onClick={() => setOpen(false)} className="group flex min-h-12 items-center gap-3 rounded-xl px-3 py-1.5 text-sm font-semibold text-white/80 transition hover:bg-white/10 hover:text-white">
-                        <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-white/5 text-[#e1c98f] group-hover:bg-white/10">
-                          <Video size={17} aria-hidden="true" />
-                        </span>
-                        <span>Manage video library</span>
-                      </Link>
-                    </li>
                   </ul>
                 </>
               ) : (

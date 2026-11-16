@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
-import { ArrowUpRight, Building2, CalendarCheck, ChevronDown, ContactRound, Home, LogIn, Menu, Search, UserPlus, UserRound, UsersRound, X } from "lucide-react";
+import { ArrowUpRight, Building2, CalendarCheck, ChevronDown, Clapperboard, ContactRound, Home, LogIn, Menu, Search, UserPlus, UserRound, UsersRound, X } from "lucide-react";
 import Logo from "./Logo";
 import SiteSearch from "./SiteSearch";
 import NotificationBell from "./notifications/NotificationBell";
@@ -238,6 +238,19 @@ export default function Header({ menuOpen, onMenuOpen }) {
                   </div>
                 )}
               </div>
+              <NavLink
+                to="/videos"
+                className={({ isActive }) =>
+                  `group hidden h-11 items-center gap-2 rounded-full px-3 text-sm font-semibold tracking-[-.01em] transition-all duration-200 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#c9a45c]/20 xl:inline-flex ${
+                    isActive
+                      ? "bg-[#f3ead8] text-[#142536] shadow-sm ring-1 ring-inset ring-[#c9a45c]/30"
+                      : "text-[#263746] hover:bg-[#fbf6ea] hover:text-[#142536]"
+                  }`
+                }
+              >
+                <Clapperboard size={18} strokeWidth={2} aria-hidden="true" className="text-[#80602b] transition-transform duration-200 group-hover:scale-110" />
+                Videos
+              </NavLink>
               <NavLink
                 to="/about"
                 className={({ isActive }) =>
