@@ -7,13 +7,11 @@ import ChatWidget from "./chat/ChatWidget";
 import LeadDialogHost from "./LeadDialog";
 import Toaster from "./Toaster";
 import CookieConsent from "./CookieConsent";
-import AdminRail, { ADMIN_RAIL_WIDTH } from "./AdminRail";
-import useOwner from "../hooks/useOwner";
+import AdminRail from "./AdminRail";
 import { trackPageView } from "../analytics/analytics";
 
 export default function Layout({ children }) {
   const { pathname } = useLocation();
-  const { isStaff } = useOwner();
 
   // Scroll to top only when the page changes, not when query params change
   // (e.g. typing in the blog search), which would otherwise jump the page.
@@ -41,9 +39,9 @@ export default function Layout({ children }) {
   return (
     <>
       <Header />
-      {/* Signed-in staff get a slim admin sidebar on the left (large screens). */}
+      {/* Shared site menu with visitor navigation and staff shortcuts. */}
       <AdminRail />
-      <div className={isStaff ? ADMIN_RAIL_WIDTH : undefined}>
+      <div>
         <main>{children}</main>
         <Footer />
       </div>
