@@ -13,6 +13,7 @@ const Contact = lazy(() => import("./pages/Contact"));
 const BookVisit = lazy(() => import("./pages/BookVisit"));
 const Videos = lazy(() => import("./pages/Videos"));
 const VideoAdminAuth = lazy(() => import("./pages/VideoAdminAuth"));
+const CustomerAuth = lazy(() => import("./pages/CustomerAuth"));
 const Blog = lazy(() => import("./pages/Blog"));
 const BlogDetails = lazy(() => import("./pages/BlogDetails"));
 const Privacy = lazy(() => import("./pages/Privacy"));
@@ -84,6 +85,7 @@ export default function App() {
             <Route path="/book-visit" element={<BookVisit />} />
             <Route path="/videos" element={<Videos />} />
             <Route path="/video-admin/login" element={<VideoAdminAuth />} />
+            <Route path="/account" element={<CustomerAuth />} />
             <Route
               path="/video-admin/signup"
               element={<Navigate to="/video-admin/login" replace />}

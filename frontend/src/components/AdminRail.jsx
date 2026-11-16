@@ -93,6 +93,16 @@ export default function AdminRail({ open, setOpen }) {
               </Link>
             </div>
 
+            <div className="px-4 pb-4">
+              <Link
+                to="/account"
+                onClick={() => setOpen(false)}
+                className="flex min-h-11 items-center justify-center gap-2 rounded-full border border-white/20 px-4 py-2 text-sm font-bold text-white transition hover:border-[#e1c98f] hover:text-[#e1c98f]"
+              >
+                Sign in / Sign up
+              </Link>
+            </div>
+
             <nav className="min-h-0 flex-1 overflow-y-auto px-3 pb-4" aria-label="Main menu">
               <p className="px-3 pb-2 pt-1 text-[10px] font-bold uppercase tracking-[.18em] text-[#e1c98f]">Explore Gratia Estates</p>
               <ul className="space-y-1">

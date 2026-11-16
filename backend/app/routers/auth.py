@@ -1,5 +1,6 @@
 import logging
 import os
+import re
 import secrets
 from datetime import datetime, timedelta, timezone
 
@@ -13,6 +14,7 @@ from sqlalchemy.orm import Session
 from .. import config  # noqa: F401
 from .. import otp
 from ..database import get_db
+from ..delivery.sms import to_e164
 from ..dependencies import ACCESS_COOKIE, REFRESH_COOKIE, get_current_user
 from ..models import (
     EmailChangeChallenge,
@@ -37,6 +39,7 @@ logger = logging.getLogger("gratia.auth")
 COOKIE_SECURE = os.getenv("COOKIE_SECURE", "false").lower() == "true"
 COOKIE_SAMESITE = os.getenv("COOKIE_SAMESITE", "lax")
 VIDEO_ADMIN_EMAIL = os.getenv("VIDEO_ADMIN_EMAIL", "").strip().lower()
+GOOGLE_OAUTH_CLIENT_ID = os.getenv("GOOGLE_OAUTH_CLIENT_ID", "").strip()
 # Path the browser sees in front of the API, e.g. "/api" when the frontend host
 # proxies /api/* to this backend. The refresh cookie must be scoped to it.
 API_PATH_PREFIX = os.getenv("API_PATH_PREFIX", "").strip().rstrip("/")
@@ -129,7 +132,9 @@ def _issue_challenge(
     delivered_via = channel
     try:
         if channel == "phone":
-            phone = otp.owner_phone()
+            phone = user.phone_number if user.role == "user" else otp.owner_phone()
+            if not phone:
+                raise HTTPException(status_code=400, detail="A mobile number is not registered for this account.")
             delivered_via = otp.send_sms_code(phone, code, "sign-in")
             recipient = otp.mask_phone(phone)
         elif channel == "whatsapp":
@@ -250,6 +255,135 @@ def login(data: LoginRequest, request: Request, db: Session = Depends(get_db)):
         raise HTTPException(status_code=403, detail="User account is inactive")
     _enforce_cooldown(owner, db)
     return _issue_challenge(owner, db, channel=data.otp_channel, show_code=_is_local_request(request))
+
+
+class CustomerPhoneRequest(BaseModel):
+    phone: str = Field(min_length=8, max_length=24)
+
+
+class CustomerPhoneSignupRequest(CustomerPhoneRequest):
+    name: str = Field(min_length=1, max_length=100)
+    email: EmailStr
+
+
+class GoogleSignInRequest(BaseModel):
+    credential: str = Field(min_length=20, max_length=8192)
+
+
+def _normalized_phone(raw_phone: str) -> str:
+    phone = to_e164(raw_phone)
+    if not re.fullmatch(r"\+[1-9]\d{7,14}", phone):
+        raise HTTPException(status_code=422, detail="Enter a valid phone number with its country code.")
+    return phone
+
+
+def _require_customer_sms() -> None:
+    if not otp.phone_delivery_available():
+        raise HTTPException(status_code=503, detail="Phone OTP sign-in is not configured.")
+
+
+@router.post("/customer/phone/login")
+def customer_phone_login(
+    data: CustomerPhoneRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Send an OTP to an existing customer's phone number."""
+    _require_customer_sms()
+    phone = _normalized_phone(data.phone)
+    user = db.scalar(select(User).where(User.phone_number == phone, User.role == "user"))
+    if user is None:
+        raise HTTPException(status_code=404, detail="No account found for this number. Please sign up first.")
+    if not user.is_active:
+        raise HTTPException(status_code=403, detail="User account is inactive.")
+    _enforce_cooldown(user, db)
+    return _issue_challenge(user, db, channel="phone", show_code=_is_local_request(request))
+
+
+@router.post("/customer/phone/signup")
+def customer_phone_signup(
+    data: CustomerPhoneSignupRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Create a public customer account and verify its phone number by OTP."""
+    _require_customer_sms()
+    phone = _normalized_phone(data.phone)
+    email = str(data.email).strip().lower()
+    if db.scalar(select(User.id).where(User.phone_number == phone)):
+        raise HTTPException(status_code=409, detail="This phone number is already registered. Please sign in.")
+    if db.scalar(select(User.id).where(func.lower(User.email) == email)):
+        raise HTTPException(status_code=409, detail="This email is already registered. Please sign in.")
+
+    user = User(
+        name=data.name.strip(),
+        email=email,
+        phone_number=phone,
+        password_hash=hash_password(secrets.token_urlsafe(32)),
+        role="user",
+    )
+    if not user.name:
+        raise HTTPException(status_code=422, detail="Enter your name.")
+    db.add(user)
+    try:
+        db.flush()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="An account already exists with this email or phone number.")
+    return _issue_challenge(user, db, channel="phone", show_code=_is_local_request(request))
+
+
+def _verify_google_credential(credential: str) -> dict:
+    from google.auth.transport.requests import Request as GoogleRequest
+    from google.oauth2 import id_token
+
+    return id_token.verify_oauth2_token(credential, GoogleRequest(), GOOGLE_OAUTH_CLIENT_ID)
+
+
+@router.post("/customer/google", response_model=AuthResponse)
+def customer_google_login(
+    data: GoogleSignInRequest,
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_db),
+):
+    """Verify a Google ID token and sign in or create a public customer account."""
+    if not GOOGLE_OAUTH_CLIENT_ID:
+        raise HTTPException(status_code=503, detail="Google sign-in is not configured.")
+    try:
+        claims = _verify_google_credential(data.credential)
+    except ValueError:
+        raise HTTPException(status_code=401, detail="The Google sign-in credential is invalid or expired.")
+    except Exception:
+        logger.exception("Google credential verification failed")
+        raise HTTPException(status_code=503, detail="Google sign-in is temporarily unavailable.")
+
+    email = str(claims.get("email") or "").strip().lower()
+    name = str(claims.get("name") or "").strip()
+    if claims.get("email_verified") is not True or not email or not name:
+        raise HTTPException(status_code=401, detail="Google must provide a verified email and name.")
+
+    user = db.scalar(select(User).where(func.lower(User.email) == email))
+    if user is not None and user.role != "user":
+        raise HTTPException(status_code=403, detail="This email is reserved for staff sign-in.")
+    if user is None:
+        user = User(
+            name=name[:100],
+            email=email,
+            password_hash=hash_password(secrets.token_urlsafe(32)),
+            role="user",
+        )
+        db.add(user)
+        try:
+            db.commit()
+        except IntegrityError:
+            db.rollback()
+            user = db.scalar(select(User).where(func.lower(User.email) == email))
+            if user is None or user.role != "user":
+                raise HTTPException(status_code=409, detail="Could not create this account. Please try again.")
+    if not user.is_active:
+        raise HTTPException(status_code=403, detail="User account is inactive.")
+    return _complete_login(user, response, request)
 
 
 def _owner_exists() -> bool:
@@ -482,7 +616,7 @@ def resend_login_code(data: OtpResendRequest, request: Request, db: Session = De
         else "whatsapp" if challenge.id.startswith(WHATSAPP_PREFIX)
         else "email"
     )
-    if channel == "phone" and not otp.phone_otp_available():
+    if channel == "phone" and not otp.phone_delivery_available():
         raise HTTPException(status_code=503, detail="Phone verification is not configured.")
     if channel == "whatsapp" and not otp.whatsapp_otp_available():
         raise HTTPException(status_code=503, detail="WhatsApp verification is not configured.")

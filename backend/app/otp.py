@@ -57,9 +57,12 @@ def whatsapp_otp_available() -> bool:
 
 
 def phone_otp_available() -> bool:
-    return bool(owner_phone()) and (
-        sms_delivery.configured() or console_fallback_enabled()
-    )
+    return bool(owner_phone()) and phone_delivery_available()
+
+
+def phone_delivery_available() -> bool:
+    """True when SMS delivery can send to any verified user phone number."""
+    return sms_delivery.configured() or console_fallback_enabled()
 
 
 # ----------------------------------------------------------------------- codes

@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
-import { Building2, CalendarCheck, ChevronDown, Home, Menu } from "lucide-react";
+import { Building2, CalendarCheck, ChevronDown, Home, Menu, UserRound } from "lucide-react";
 import Logo from "./Logo";
 import SiteSearch from "./SiteSearch";
 import NotificationBell from "./notifications/NotificationBell";
 import InstallAppButton from "./InstallAppButton";
 import useSiteSettings from "../hooks/useSiteSettings";
+import useOwner from "../hooks/useOwner";
 import { projects } from "../data/projects";
 import { usePropertiesVersion } from "../data/liveProperties";
 
@@ -14,6 +15,7 @@ export default function Header({ menuOpen, onMenuOpen }) {
   const [propertiesOpen, setPropertiesOpen] = useState(false);
   const propertiesMenuRef = useRef(null);
   const { pathname } = useLocation();
+  const { user } = useOwner();
   usePropertiesVersion();
 
   useEffect(() => setPropertiesOpen(false), [pathname]);
@@ -124,6 +126,13 @@ export default function Header({ menuOpen, onMenuOpen }) {
               >
                 <CalendarCheck size={17} aria-hidden="true" />
                 Book a visit
+              </Link>
+              <Link
+                to="/account"
+                className="hidden h-11 items-center gap-2 whitespace-nowrap rounded-full border border-[#e7e2d8] bg-white px-4 text-sm font-bold text-[#142536] transition hover:border-[#c9a45c] hover:bg-[#fbf6ea] lg:inline-flex"
+              >
+                <UserRound size={17} aria-hidden="true" />
+                {user?.role === "user" ? "Account" : "Login / Sign up"}
               </Link>
             </div>
           </div>

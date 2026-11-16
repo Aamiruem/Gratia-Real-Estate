@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine
+from sqlalchemy import Index, create_engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from . import config
@@ -64,3 +64,4 @@ def create_tables():
     from .migrate import add_missing_columns
 
     add_missing_columns(engine, Base.metadata)
+    Index("ix_users_phone_number", User.phone_number, unique=True).create(bind=engine, checkfirst=True)

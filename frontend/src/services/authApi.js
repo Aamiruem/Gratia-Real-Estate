@@ -12,6 +12,24 @@ export const authApi = {
       ),
     }),
 
+  customerPhoneLogin: (phone) =>
+    apiRequest("/auth/customer/phone/login", {
+      method: "POST",
+      body: JSON.stringify({ phone }),
+    }),
+
+  customerPhoneSignup: (name, email, phone) =>
+    apiRequest("/auth/customer/phone/signup", {
+      method: "POST",
+      body: JSON.stringify({ name, email, phone }),
+    }),
+
+  customerGoogleLogin: (credential) =>
+    apiRequest("/auth/customer/google", {
+      method: "POST",
+      body: JSON.stringify({ credential }),
+    }),
+
   otpOptions: () => apiRequest("/auth/otp/options"),
 
   // Step 2 of owner sign-in: the 6-digit code sent by email or SMS.
