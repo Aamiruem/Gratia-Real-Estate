@@ -247,11 +247,11 @@ export default function SiteSearch({ className = "", variant = "icon" }) {
         className={
           variant === "full"
             ? // Round icon button on narrower screens, "Search  Ctrl K" pill from 1440px.
-              `inline-flex size-11 items-center justify-center gap-2 rounded-full border border-[#e7e2d8] bg-white text-[13px] font-semibold text-[#142536] transition hover:border-[#c9a45c] min-[1440px]:w-auto min-[1440px]:bg-[#f8f6f1] min-[1440px]:pl-3.5 min-[1440px]:pr-2 min-[1440px]:hover:bg-white ${className}`
-            : `inline-flex size-11 items-center justify-center rounded-full border border-[#e7e2d8] bg-white text-[#142536] transition hover:border-[#c9a45c] hover:text-[#9a7940] ${className}`
+              `group inline-flex size-11 items-center justify-center gap-2 rounded-full border border-[#e7e2d8] bg-white text-[13px] font-semibold text-[#263746] shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-[#c9a45c] hover:bg-[#fbf6ea] hover:text-[#142536] hover:shadow-md active:translate-y-0 active:scale-95 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#c9a45c]/25 min-[1440px]:w-auto min-[1440px]:bg-[#f8f6f1] min-[1440px]:pl-3.5 min-[1440px]:pr-2 min-[1440px]:hover:bg-white ${className}`
+            : `group inline-flex size-11 items-center justify-center rounded-full border border-[#e7e2d8] bg-white text-[#263746] shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-[#c9a45c] hover:bg-[#fbf6ea] hover:text-[#80602b] hover:shadow-md active:translate-y-0 active:scale-95 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#c9a45c]/25 ${className}`
         }
       >
-        <Search size={18} strokeWidth={2} aria-hidden="true" />
+        <Search size={18} strokeWidth={2} aria-hidden="true" className="transition-transform duration-200 group-hover:scale-110" />
         {variant === "full" ? (
           <>
             <span className="sr-only min-[1440px]:not-sr-only">Search</span>

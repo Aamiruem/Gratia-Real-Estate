@@ -229,7 +229,7 @@ const VARIANTS = {
   header:
     "hidden size-11 items-center justify-center gap-2 whitespace-nowrap rounded-full border border-[#e7e2d8] bg-white text-[13px] font-semibold text-[#142536] transition hover:border-[#c9a45c] hover:text-[#80602b] 2xl:inline-flex",
   navbar:
-    "inline-flex size-11 items-center justify-center rounded-full border border-[#e7e2d8] bg-white text-[#142536] transition hover:border-[#c9a45c] hover:bg-[#fbf6ea] hover:text-[#80602b]",
+    "inline-flex size-11 items-center justify-center rounded-full border border-[#e7e2d8] bg-white text-[#80602b] shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-[#c9a45c] hover:bg-[#fbf6ea] hover:shadow-md active:translate-y-0 active:scale-95 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#c9a45c]/25",
   menu: "flex w-full items-center justify-center gap-2 rounded-full border border-[#142536] bg-white px-4 py-3 text-sm font-bold text-[#142536]",
   footer:
     "inline-flex items-center gap-2 rounded-full border border-white/20 px-4 py-2 text-xs font-bold text-white transition hover:border-[#e1c98f] hover:text-[#e1c98f]",

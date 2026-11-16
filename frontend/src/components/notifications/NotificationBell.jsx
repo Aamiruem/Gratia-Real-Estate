@@ -112,9 +112,13 @@ export default function NotificationBell() {
         aria-label={label}
         aria-expanded={open}
         aria-haspopup="dialog"
-        className="relative grid size-11 place-items-center rounded-full border border-[#e7e2d8] bg-white text-[#142536] transition hover:border-[#c9a45c] hover:text-[#80602b]"
+        className={`relative grid size-11 place-items-center rounded-full border shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md active:translate-y-0 active:scale-95 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#c9a45c]/25 ${
+          open
+            ? "border-[#c9a45c] bg-[#fbf6ea] text-[#80602b]"
+            : "border-[#e7e2d8] bg-white text-[#263746] hover:border-[#c9a45c] hover:bg-[#fbf6ea] hover:text-[#80602b]"
+        }`}
       >
-        <Bell size={19} strokeWidth={1.9} aria-hidden="true" />
+        <Bell size={19} strokeWidth={2} aria-hidden="true" />
         {unread > 0 && (
           <span className="absolute -right-1 -top-1 grid min-w-5 place-items-center rounded-full bg-rose-600 px-1 text-[10px] font-bold leading-5 text-white ring-2 ring-white">
             {unread > 99 ? "99+" : unread}
