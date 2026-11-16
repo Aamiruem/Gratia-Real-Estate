@@ -223,13 +223,13 @@ export default function PasswordSignIn({ onSignedIn, onUseCode }) {
         {busy && <Loader2 size={17} className="animate-spin" aria-hidden="true" />}
         {busy ? "Signing in…" : "Sign in"}
       </button>
-      <p className="text-center text-xs leading-5 text-[#5e6872]">
+      {onUseCode && <p className="text-center text-xs leading-5 text-[#5e6872]">
         No password yet?{" "}
         <button type="button" onClick={onUseCode} className="font-semibold text-[#142536] underline">
           Sign in with a one-time code
         </button>
         , then set one in Admin → My account.
-      </p>
+      </p>}
     </form>
   );
 }

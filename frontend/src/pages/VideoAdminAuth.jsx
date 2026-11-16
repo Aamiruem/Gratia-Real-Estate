@@ -25,6 +25,7 @@ export default function VideoAdminAuth() {
   const [submitting, setSubmitting] = useState(false);
   // Step 2 (one-time code): { id, sentTo, channel, deliveredVia, resendAfter }
   const [challenge, setChallenge] = useState(null);
+  const hasOtpChannel = Boolean(otpOptions.email || otpOptions.phone || otpOptions.whatsapp);
 
   useEffect(() => {
     authApi
@@ -150,7 +151,7 @@ export default function VideoAdminAuth() {
             </div>
             <h2 className="font-display text-3xl font-semibold text-[#142536] sm:text-4xl">Sign in</h2>
 
-            {!challenge && (
+            {!challenge && hasOtpChannel && (
               <div className="mt-6 grid grid-cols-2 gap-1 rounded-full bg-[#f1ede4] p-1" role="tablist" aria-label="Sign-in method">
                 {[
                   { id: "password", label: "Password", Icon: KeyRound },
@@ -172,6 +173,11 @@ export default function VideoAdminAuth() {
                 ))}
               </div>
             )}
+            {otpOptionsLoaded && !hasOtpChannel && (
+              <p role="status" className="mt-4 rounded-xl border border-[#e7e2d8] bg-[#fbf8f0] px-4 py-3 text-sm leading-6 text-[#5e6872]">
+                One-time-code sign-in is unavailable right now. Sign in with your email and password.
+              </p>
+            )}
             {method === "code" && !challenge && (
               <p className="mt-4 text-sm leading-6 text-[#5e6872]">Choose where to receive your one-time code.</p>
             )}
@@ -183,7 +189,7 @@ export default function VideoAdminAuth() {
             )}
 
             {method === "password" && !challenge ? (
-              <PasswordSignIn onSignedIn={finish} onUseCode={() => setMethod("code")} />
+              <PasswordSignIn onSignedIn={finish} onUseCode={hasOtpChannel ? () => setMethod("code") : undefined} />
             ) : challenge ? (
               <CodeStep
                 challenge={challenge}
