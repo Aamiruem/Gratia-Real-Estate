@@ -1,5 +1,5 @@
 from fastapi import Depends, HTTPException, Request, status
-from jose import JWTError
+from jwt import InvalidTokenError as JWTError
 from sqlalchemy.orm import Session
 
 from .database import get_db

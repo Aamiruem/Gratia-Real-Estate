@@ -16,7 +16,7 @@ from typing import Optional
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, Response, status
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import StreamingResponse
-from jose import JWTError
+from jwt import InvalidTokenError as JWTError
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy import delete, func, select, update
 from sqlalchemy.orm import Session

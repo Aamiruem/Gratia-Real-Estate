@@ -4,7 +4,7 @@ import secrets
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
-from jose import JWTError
+from jwt import InvalidTokenError as JWTError
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import delete, func, select
 from sqlalchemy.exc import IntegrityError
