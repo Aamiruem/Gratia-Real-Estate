@@ -101,7 +101,19 @@ export default async function handler(req, res) {
       redirect: "manual",
       signal: AbortSignal.timeout(25_000),
     });
-  } catch {
+  } catch (error) {
+    let backendHost = "invalid-backend-url";
+    try {
+      backendHost = new URL(backend).host;
+    } catch {
+      // Keep malformed or secret-like values out of the public error response.
+    }
+    console.error("Backend proxy request failed", {
+      method: req.method,
+      path,
+      backendHost,
+      error: error instanceof Error ? `${error.name}: ${error.message}` : "Unknown fetch error",
+    });
     res.status(502).json({ detail: "The API server did not respond. It may be starting up; please try again in a moment." });
     return;
   }
