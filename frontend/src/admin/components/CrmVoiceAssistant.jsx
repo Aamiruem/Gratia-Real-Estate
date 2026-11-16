@@ -21,6 +21,7 @@ export default function CrmVoiceAssistant() {
   const [error, setError] = useState("");
   const recognition = useRef(null);
   const bottom = useRef(null);
+  const assistantReady = Boolean(status?.assistant_enabled || status?.assistant_test_mode);
 
   useEffect(() => {
     adminApi.crmVoiceStatus().then(setStatus, (requestError) => setError(requestError.message));
@@ -162,16 +163,26 @@ export default function CrmVoiceAssistant() {
 
             <div className="flex flex-wrap gap-2 border-b border-[#e7e2d8] bg-[#fbfaf7] px-4 py-3 text-xs">
               <span className={`rounded-full px-3 py-1 font-semibold ${status?.assistant_enabled ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-900"}`}>
-                CRM assistant {status?.assistant_enabled ? "ready" : "needs OpenAI setup"}
+                CRM assistant {status?.assistant_enabled ? "live" : status?.assistant_test_mode ? "test mode" : "disabled"}
               </span>
               <span className={`rounded-full px-3 py-1 font-semibold ${status?.phone_enabled ? "bg-emerald-100 text-emerald-800" : "bg-slate-200 text-slate-700"}`}>
-                Retell calls {status?.phone_enabled ? "ready" : "needs setup"}
+                Phone calls {status?.phone_enabled ? "Retell ready" : "Retell setup required"}
               </span>
             </div>
 
-            {!status?.assistant_enabled && (
+            {status?.assistant_test_mode && (
               <p className="mx-4 mt-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm leading-5 text-amber-950">
-                Configure <code>OPENAI_API_KEY</code> on the backend and enable the AI assistant in Admin settings to use CRM answers. Your question is not sent until that service is enabled.
+                Test mode is active: text, microphone transcription, CRM access and spoken replies can be checked without sending data to OpenAI. Real AI answers need <code>OPENAI_API_KEY</code>.
+              </p>
+            )}
+            {status && !assistantReady && (
+              <p className="mx-4 mt-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm leading-5 text-amber-950">
+                Enable the assistant in Admin settings to continue. No CRM data is sent to an AI provider while it is disabled.
+              </p>
+            )}
+            {!status?.phone_enabled && status?.phone_missing_settings?.length > 0 && (
+              <p className="mx-4 mt-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs leading-5 text-[#4b5966]">
+                Live phone calls are disabled. Add these backend secrets to test a real call: <code>{status.phone_missing_settings.join(", ")}</code>. No phone call is simulated or placed without them.
               </p>
             )}
 
@@ -226,7 +237,7 @@ export default function CrmVoiceAssistant() {
               </button>
               <label className="sr-only" htmlFor="crm-voice-input">Ask the CRM assistant</label>
               <input id="crm-voice-input" value={draft} onChange={(event) => setDraft(event.target.value)} maxLength={1000} placeholder={listening ? "Listening…" : "Ask about leads, follow-ups, properties…"} className="min-w-0 flex-1 rounded-full border border-[#d9dce0] px-4 py-3 text-sm outline-none focus:border-[#c9a45c]" />
-              <button type="submit" disabled={!draft.trim() || busy || !status?.assistant_enabled} aria-label="Send question" className="grid size-11 shrink-0 place-items-center rounded-full bg-[#142536] text-white disabled:opacity-40"><Send size={17} aria-hidden="true" /></button>
+              <button type="submit" disabled={!draft.trim() || busy || !assistantReady} aria-label="Send question" className="grid size-11 shrink-0 place-items-center rounded-full bg-[#142536] text-white disabled:opacity-40"><Send size={17} aria-hidden="true" /></button>
             </form>
           </section>
         </div>

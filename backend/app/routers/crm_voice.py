@@ -62,10 +62,18 @@ def _retell_configured() -> bool:
     )
 
 
-def _assistant_enabled(db: Session) -> bool:
+def _assistant_setting_enabled(db: Session) -> bool:
     from .admin import load_settings
 
-    return bool(config.env("OPENAI_API_KEY")) and load_settings(db).get("ai_assistant_enabled", True)
+    return bool(load_settings(db).get("ai_assistant_enabled", True))
+
+
+def _assistant_enabled(db: Session) -> bool:
+    return bool(config.env("OPENAI_API_KEY")) and _assistant_setting_enabled(db)
+
+
+def _assistant_test_mode(db: Session) -> bool:
+    return not bool(config.env("OPENAI_API_KEY")) and _assistant_setting_enabled(db)
 
 
 @router.get("/status")
@@ -73,9 +81,15 @@ def voice_status(
     db: Session = Depends(get_db),
     _staff: User = Depends(require_any_staff),
 ):
+    missing_phone_settings = [
+        name for name in ("RETELL_API_KEY", "RETELL_AGENT_ID", "RETELL_PHONE_NUMBER")
+        if not config.env(name)
+    ]
     return {
         "assistant_enabled": _assistant_enabled(db),
-        "phone_enabled": _retell_configured(),
+        "assistant_test_mode": _assistant_test_mode(db),
+        "phone_enabled": not missing_phone_settings,
+        "phone_missing_settings": missing_phone_settings,
     }
 
 
@@ -147,9 +161,24 @@ def crm_assistant(
     db: Session = Depends(get_db),
     staff: User = Depends(require_any_staff),
 ):
-    if not _assistant_enabled(db):
+    if not _assistant_setting_enabled(db):
         raise HTTPException(status_code=503, detail="The CRM voice assistant is not configured.")
     ratelimit.hit(f"crm-voice:{staff.id}", limit=30, window_seconds=600)
+
+    api_key = config.env("OPENAI_API_KEY")
+    if not api_key:
+        # Safe local test path: exercise authentication, CRM reads, microphone
+        # transcription and browser speech without sending data to an AI provider.
+        query = payload.messages[-1].content.strip()
+        snapshot = _crm_context(db)
+        return {
+            "reply": (
+                "Test mode: no OpenAI request was made. The staff session and CRM data connection are working.\n\n"
+                f"CRM snapshot for ‘{query[:160]}’:\n{snapshot[:1100]}"
+            ),
+            "proposal": None,
+            "mode": "test",
+        }
 
     system = (
         "You are the Gratia Estates staff-only CRM assistant. Use only the CRM context below; "
@@ -190,7 +219,7 @@ def crm_assistant(
         config.env("OPENAI_BASE_URL", "https://api.openai.com/v1").rstrip("/") + "/chat/completions",
         data=json.dumps(body).encode("utf-8"),
         headers={
-            "Authorization": f"Bearer {config.env('OPENAI_API_KEY')}",
+            "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
         },
         method="POST",
@@ -215,6 +244,7 @@ def crm_assistant(
                 raise HTTPException(status_code=422, detail="Follow-up time must be in the future.")
             return {
                 "reply": "Please review this follow-up and confirm before I save it.",
+                "mode": "live",
                 "proposal": {
                     "lead_reference": lead.reference,
                     "lead_name": lead.name,
@@ -225,7 +255,7 @@ def crm_assistant(
         reply = (message.get("content") or "").strip()
         if not reply:
             raise ValueError("Assistant response was empty.")
-        return {"reply": reply[:2000], "proposal": None}
+        return {"reply": reply[:2000], "proposal": None, "mode": "live"}
     except HTTPException:
         raise
     except HTTPError as error:
