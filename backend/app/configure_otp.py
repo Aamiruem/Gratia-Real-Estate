@@ -27,6 +27,12 @@ def _test_smtp(host: str, port: int, username: str, password: str) -> None:
                 smtp.starttls(context=ssl.create_default_context())
                 smtp.ehlo()
                 smtp.login(username, password)
+    except smtplib.SMTPAuthenticationError as error:
+        raise ValueError(
+            "SMTP login was rejected. For Gmail, use the full Gmail address "
+            "(for example name@gmail.com) and a current 16-character App Password "
+            "from the same account. Confirm 2-Step Verification is enabled."
+        ) from error
     except (OSError, smtplib.SMTPException) as error:
         raise ValueError(
             "SMTP connection or login failed. Check the host, port, username, "
@@ -118,8 +124,13 @@ def main() -> None:
         smtp_port = _setting("SMTP port", current.get("SMTP_PORT") or "587")
         if not smtp_port.isdigit() or not 1 <= int(smtp_port) <= 65535:
             raise ValueError("SMTP port must be a number between 1 and 65535.")
-        smtp_user = _setting("SMTP account email / username", current.get("SMTP_USER"))
-        smtp_password = _secret("SMTP password or email app password", current.get("SMTP_PASSWORD"))
+        smtp_user = _setting(
+            "SMTP account email / username (Gmail requires the full address, e.g. name@gmail.com)",
+            current.get("SMTP_USER"),
+        )
+        # Gmail displays App Passwords in groups with spaces; SMTP expects the
+        # 16-character value without those visual separators.
+        smtp_password = _secret("SMTP password or email app password", current.get("SMTP_PASSWORD")).replace(" ", "")
         smtp_from = _setting("From address", current.get("SMTP_FROM") or smtp_user)
         _test_smtp(smtp_host, int(smtp_port), smtp_user, smtp_password)
         print("SMTP login verified.")
