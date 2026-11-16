@@ -14,7 +14,7 @@ export default function CustomerAuth() {
   const navigate = useNavigate();
   const location = useLocation();
   const { checked, user } = useOwner();
-  const [mode, setMode] = useState("login");
+  const [mode, setMode] = useState(() => new URLSearchParams(location.search).get("mode") === "signup" ? "signup" : "login");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
@@ -26,6 +26,15 @@ export default function CustomerAuth() {
   const googleButtonRef = useRef(null);
   const googleCallbackRef = useRef(null);
   const nextPath = typeof location.state?.from === "string" ? location.state.from : null;
+
+  useEffect(() => {
+    const requestedMode = new URLSearchParams(location.search).get("mode");
+    if (requestedMode !== "login" && requestedMode !== "signup") return;
+    setMode(requestedMode);
+    setChallenge(null);
+    setCode("");
+    setError("");
+  }, [location.search]);
 
   const finishSignIn = useCallback(async (result) => {
     if (result.user?.role !== "user") {

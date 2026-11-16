@@ -229,7 +229,7 @@ const VARIANTS = {
   header:
     "hidden size-11 items-center justify-center gap-2 whitespace-nowrap rounded-full border border-[#e7e2d8] bg-white text-[13px] font-semibold text-[#142536] transition hover:border-[#c9a45c] hover:text-[#80602b] 2xl:inline-flex",
   navbar:
-    "inline-flex size-11 items-center justify-center gap-2 whitespace-nowrap rounded-full border border-[#e7e2d8] bg-white px-3 text-[13px] font-semibold text-[#142536] transition hover:border-[#c9a45c] hover:text-[#80602b] sm:w-auto",
+    "inline-flex size-11 items-center justify-center rounded-full border border-[#e7e2d8] bg-white text-[#142536] transition hover:border-[#c9a45c] hover:bg-[#fbf6ea] hover:text-[#80602b]",
   menu: "flex w-full items-center justify-center gap-2 rounded-full border border-[#142536] bg-white px-4 py-3 text-sm font-bold text-[#142536]",
   footer:
     "inline-flex items-center gap-2 rounded-full border border-white/20 px-4 py-2 text-xs font-bold text-white transition hover:border-[#e1c98f] hover:text-[#e1c98f]",
@@ -278,7 +278,7 @@ export default function InstallAppButton({ variant = "header", className = "" })
       <button
         type="button"
         onClick={onClick}
-        title={variant === "header" ? "Install the Gratia Estates app" : undefined}
+        title={variant === "header" || variant === "navbar" ? (installed && !canPrompt ? "App installed" : "Install App") : undefined}
         className={`${VARIANTS[variant]} ${className}`}
       >
         {installed && !canPrompt ? (
@@ -286,7 +286,7 @@ export default function InstallAppButton({ variant = "header", className = "" })
         ) : (
           <Download size={16} aria-hidden="true" />
         )}
-        <span className={variant === "header" ? "sr-only" : variant === "navbar" ? "hidden sm:inline" : undefined}>
+        <span className={variant === "header" || variant === "navbar" ? "sr-only" : undefined}>
           {installed && !canPrompt ? "App installed" : "Install App"}
         </span>
       </button>

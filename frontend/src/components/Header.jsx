@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
-import { Building2, CalendarCheck, ChevronDown, Home, Menu, UserRound } from "lucide-react";
+import { Building2, CalendarCheck, ChevronDown, Home, LogIn, Menu, UserPlus, UserRound } from "lucide-react";
 import Logo from "./Logo";
 import SiteSearch from "./SiteSearch";
 import NotificationBell from "./notifications/NotificationBell";
@@ -15,12 +15,17 @@ const FEATURED_PROJECTS = ["Roots Courtyard", "Bestech"];
 /** Keep the header focused on the brand and a single menu trigger. */
 export default function Header({ menuOpen, onMenuOpen }) {
   const [propertiesOpen, setPropertiesOpen] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
   const propertiesMenuRef = useRef(null);
+  const accountMenuRef = useRef(null);
   const { pathname } = useLocation();
   const { user } = useOwner();
   usePropertiesVersion();
 
-  useEffect(() => setPropertiesOpen(false), [pathname]);
+  useEffect(() => {
+    setPropertiesOpen(false);
+    setAccountOpen(false);
+  }, [pathname]);
 
   useEffect(() => {
     if (!propertiesOpen) return undefined;
@@ -35,6 +40,20 @@ export default function Header({ menuOpen, onMenuOpen }) {
       window.removeEventListener("keydown", onKey);
     };
   }, [propertiesOpen]);
+
+  useEffect(() => {
+    if (!accountOpen) return undefined;
+    const onPointer = (event) => {
+      if (!accountMenuRef.current?.contains(event.target)) setAccountOpen(false);
+    };
+    const onKey = (event) => event.key === "Escape" && setAccountOpen(false);
+    document.addEventListener("pointerdown", onPointer);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onPointer);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [accountOpen]);
 
   const sortedProjects = [...projects].sort((a, b) => a.name.localeCompare(b.name));
   const featuredProjectLinks = FEATURED_PROJECTS.map((name) => {
@@ -61,7 +80,7 @@ export default function Header({ menuOpen, onMenuOpen }) {
               aria-label="Open site menu"
               aria-expanded={menuOpen}
               aria-controls="site-side-menu"
-              className="grid size-11 shrink-0 place-items-center rounded-full border border-[#c9a45c] bg-[#fbf6ea] text-[#142536] shadow-sm transition hover:bg-[#f3ead8] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#c9a45c]/30"
+              className="ml-3 grid size-11 shrink-0 place-items-center rounded-full border border-[#c9a45c] bg-[#fbf6ea] text-[#142536] shadow-sm transition hover:bg-[#f3ead8] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#c9a45c]/30"
             >
               <Menu size={21} aria-hidden="true" />
             </button>
@@ -155,19 +174,66 @@ export default function Header({ menuOpen, onMenuOpen }) {
               <SiteSearch variant="full" />
               <NotificationBell />
               <InstallAppButton variant="navbar" />
+              <div ref={accountMenuRef} className="relative hidden lg:block">
+                <button
+                  type="button"
+                  onClick={() => setAccountOpen((open) => !open)}
+                  aria-label={user?.role === "user" ? "Open account menu" : "Open login and sign up menu"}
+                  title={user?.role === "user" ? "Account" : "Login / Sign up"}
+                  aria-expanded={accountOpen}
+                  aria-controls="header-account-menu"
+                  className="inline-flex size-11 items-center justify-center rounded-full border border-[#c9a45c]/60 bg-[#fbf6ea] text-[#142536] shadow-sm transition hover:border-[#c9a45c] hover:bg-[#f3ead8] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#c9a45c]/30"
+                >
+                  <UserRound size={17} aria-hidden="true" className="text-[#80602b]" />
+                </button>
+                {accountOpen && (
+                  <div
+                    id="header-account-menu"
+                    className="absolute right-0 top-full z-[70] w-56 pt-2"
+                  >
+                    <div className="overflow-hidden rounded-2xl border border-[#e7e2d8] bg-white p-2 shadow-[0_20px_50px_rgba(13,27,42,.2)]">
+                      <p className="px-3 pb-2 pt-1 text-[10px] font-bold uppercase tracking-[.14em] text-[#80602b]">
+                        {user?.role === "user" ? "Your account" : "Customer access"}
+                      </p>
+                      {user?.role === "user" ? (
+                        <Link
+                          to="/account"
+                          onClick={() => setAccountOpen(false)}
+                          className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-[#142536] transition-colors hover:bg-[#f3ead8]"
+                        >
+                          <UserRound size={17} aria-hidden="true" className="text-[#80602b]" />
+                          My account
+                        </Link>
+                      ) : (
+                        <>
+                          <Link
+                            to="/account?mode=login"
+                            onClick={() => setAccountOpen(false)}
+                            className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-[#142536] transition-colors hover:bg-[#f3ead8]"
+                          >
+                            <LogIn size={17} aria-hidden="true" className="text-[#80602b]" />
+                            Log in
+                          </Link>
+                          <Link
+                            to="/account?mode=signup"
+                            onClick={() => setAccountOpen(false)}
+                            className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-[#142536] transition-colors hover:bg-[#f3ead8]"
+                          >
+                            <UserPlus size={17} aria-hidden="true" className="text-[#80602b]" />
+                            Sign up
+                          </Link>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
               <Link
                 to="/book-visit"
                 className="hidden h-11 items-center gap-2 whitespace-nowrap rounded-full bg-[#c9a45c] px-4 text-sm font-bold text-[#142536] transition hover:bg-[#e1c98f] lg:inline-flex"
               >
                 <CalendarCheck size={17} aria-hidden="true" />
                 Book a visit
-              </Link>
-              <Link
-                to="/account"
-                className="hidden h-11 items-center gap-2 whitespace-nowrap rounded-full border border-[#e7e2d8] bg-white px-4 text-sm font-bold text-[#142536] transition hover:border-[#c9a45c] hover:bg-[#fbf6ea] lg:inline-flex"
-              >
-                <UserRound size={17} aria-hidden="true" />
-                {user?.role === "user" ? "Account" : "Login / Sign up"}
               </Link>
             </div>
           </div>
