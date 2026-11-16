@@ -3,6 +3,7 @@ import {
   BookmarkCheck,
   CalendarCheck,
   Copy,
+  Download,
   ExternalLink,
   MessageCircle,
   MoreHorizontal,
@@ -14,6 +15,7 @@ import {
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { fetchReaction, sendReaction } from "../services/reactionsApi";
+import { getVideoSource } from "../utils/videoLibrary";
 
 const WHATSAPP_NUMBER = "919109776155";
 const SAVED_KEY = "gratia-saved-videos";
@@ -83,6 +85,17 @@ export default function VideoActions({ videoId, url, title, dark = false, compac
   // YouTube IDs are 11 characters without the "v" hash prefix used for other links.
   const isYouTube = !url || /youtu\.?be/i.test(url);
   const watchUrl = isYouTube ? `https://www.youtube.com/watch?v=${videoId}` : url;
+  const isDirectFile = getVideoSource(url || "")?.type === "file";
+  let downloadUrl = "";
+  try {
+    const parsed = new URL(url);
+    if (isDirectFile && parsed.hostname.endsWith(".public.blob.vercel-storage.com") && parsed.pathname.startsWith("/project-videos/")) {
+      parsed.searchParams.set("download", "1");
+      downloadUrl = parsed.href;
+    }
+  } catch {
+    // A direct download is only shown for stored video URLs.
+  }
 
   useEffect(() => {
     let active = true;
@@ -259,6 +272,11 @@ export default function VideoActions({ videoId, url, title, dark = false, compac
               <a role="menuitem" href={watchUrl} target="_blank" rel="noreferrer" onClick={() => setMenu("")} className="flex items-center gap-3 px-4 py-2.5 hover:bg-[#f7f4ed]">
                 <ExternalLink size={16} className="text-[#e11d48]" aria-hidden="true" /> {isYouTube ? "Watch on YouTube" : "Open original video"}
               </a>
+              {downloadUrl && (
+                <a role="menuitem" href={downloadUrl} onClick={() => setMenu("")} className="flex items-center gap-3 px-4 py-2.5 hover:bg-[#f7f4ed]">
+                  <Download size={16} className="text-[#142536]" aria-hidden="true" /> Download video
+                </a>
+              )}
               <button role="menuitem" type="button" onClick={copyLink} className="flex w-full items-center gap-3 px-4 py-2.5 text-left hover:bg-[#f7f4ed]">
                 <Copy size={16} className="text-[#68717a]" aria-hidden="true" /> Copy link
               </button>

@@ -25,6 +25,7 @@ import { projects } from "../data/projects";
 import { Link, useSearchParams } from "react-router-dom";
 import { authApi } from "../services/authApi";
 import {
+  deleteUploadedVideo,
   fetchVideos,
   getVideoKey,
   getVideoSource,
@@ -192,17 +193,24 @@ export default function Videos() {
   // Saves from the editor dialog; returns an error message, or "" on success.
   const saveFromEditor = async (values) => {
     const editingId = editor?.video?.id;
+    const previousUrl = editor?.video?.url;
     const { error: saveError } = await saveVideo({
       id: editingId || createId(),
       ...values,
     });
     if (saveError) {
+      if (values.url !== previousUrl) await deleteUploadedVideo(values.url).catch(() => {});
       console.error("Could not save video.", saveError);
       return `The video could not be saved: ${saveError.message}`;
     }
+    const oldFileCleanupFailed = previousUrl && previousUrl !== values.url
+      ? await deleteUploadedVideo(previousUrl).then(() => false).catch(() => true)
+      : false;
     const refreshedVideos = await fetchVideos();
     if (!refreshedVideos.error) setVideos(refreshedVideos.videos);
-    setNotice(editingId ? "Video updated." : "Video added.");
+    setNotice(oldFileCleanupFailed
+      ? "Video updated. The previous uploaded file could not be removed from storage."
+      : editingId ? "Video updated." : "Video added.");
     setError("");
     setEditor(null);
     return "";
@@ -297,6 +305,12 @@ export default function Videos() {
 
   const deleteVideo = async (video) => {
     if (!window.confirm(`Delete "${video.title}"? This cannot be undone.`)) {
+      return;
+    }
+    try {
+      await deleteUploadedVideo(video.url);
+    } catch (storageError) {
+      setError(`The uploaded file could not be removed: ${storageError.message}`);
       return;
     }
     const { error: deleteError } = await removeVideo(video.id);

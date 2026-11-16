@@ -1,7 +1,7 @@
-import { Check, Film, Link2, Loader2, Plus, Trash2, X } from "lucide-react";
+import { Check, Film, Link2, Loader2, Plus, Trash2, Upload, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { projects } from "../data/projects";
-import { getVideoSource } from "../utils/videoLibrary";
+import { deleteUploadedVideo, getVideoSource, uploadVideoFile } from "../utils/videoLibrary";
 import VideoPreview from "./VideoPreview";
 
 const TYPE_LABEL = { youtube: "YouTube video", vimeo: "Vimeo video", file: "Video file" };
@@ -20,9 +20,24 @@ export default function VideoEditorDialog({ initial, focus = "title", onSave, on
   });
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState("");
+  const [uploadProgress, setUploadProgress] = useState(0);
   const titleRef = useRef(null);
   const urlRef = useRef(null);
-  const source = getVideoSource(form.url.trim());
+  const fileRef = useRef(null);
+  const linkedSource = getVideoSource(form.url.trim());
+  const source = previewUrl ? { type: "file", src: previewUrl } : linkedSource;
+
+  useEffect(() => {
+    if (!selectedFile) {
+      setPreviewUrl("");
+      return undefined;
+    }
+    const url = URL.createObjectURL(selectedFile);
+    setPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [selectedFile]);
 
   useEffect(() => {
     (focus === "url" ? urlRef : titleRef).current?.focus();
@@ -39,20 +54,55 @@ export default function VideoEditorDialog({ initial, focus = "title", onSave, on
 
   const update = (field) => (event) => {
     setForm((current) => ({ ...current, [field]: event.target.value }));
+    if (field === "url") setSelectedFile(null);
     setError("");
+  };
+
+  const selectFile = (event) => {
+    const file = event.target.files?.[0] || null;
+    event.target.value = "";
+    setSelectedFile(file);
+    if (file) setForm((current) => ({ ...current, url: "" }));
+    setUploadProgress(0);
+    setError("");
+    if (file && !form.title.trim()) {
+      setForm((current) => ({ ...current, title: file.name.replace(/\.[^.]+$/, "").slice(0, 120) }));
+    }
   };
 
   const submit = async (event) => {
     event.preventDefault();
     if (!form.title.trim()) return setError("Please add a title for this video.");
-    if (!source) {
+    if (!selectedFile && !linkedSource) {
       return setError("Please paste a YouTube, Vimeo or direct video file link (.mp4, .webm, .mov).");
     }
     setBusy(true);
-    const message = await onSave({ ...form, title: form.title.trim(), url: form.url.trim(), description: form.description.trim() });
-    setBusy(false);
-    if (message) setError(message);
+    setError("");
+    let uploadedUrl = "";
+    try {
+      let url = form.url.trim();
+      if (selectedFile) {
+        const blob = await uploadVideoFile(selectedFile, ({ percentage }) => setUploadProgress(percentage));
+        url = blob.url;
+        uploadedUrl = blob.url;
+      }
+      const message = await onSave({ ...form, title: form.title.trim(), url, description: form.description.trim() });
+      if (message) {
+        if (uploadedUrl) await deleteUploadedVideo(uploadedUrl).catch(() => {});
+        setError(message);
+      }
+    } catch (uploadError) {
+      setError(uploadError.message || "The video could not be uploaded. Please try again.");
+    } finally {
+      setBusy(false);
+    }
   };
+
+  const sizeLabel = selectedFile
+    ? selectedFile.size >= 1024 ** 3
+      ? `${(selectedFile.size / 1024 ** 3).toFixed(2)} GB`
+      : `${(selectedFile.size / 1024 ** 2).toFixed(1)} MB`
+    : "";
 
   const input =
     "w-full rounded-xl border border-[#d9dce0] bg-white px-4 py-3 text-sm text-[#142536] outline-none placeholder:text-[#87909a] focus:border-[#c9a45c] focus:ring-4 focus:ring-[#c9a45c]/15";
@@ -90,7 +140,7 @@ export default function VideoEditorDialog({ initial, focus = "title", onSave, on
                 <Check size={13} aria-hidden="true" /> {TYPE_LABEL[source.type]} detected
               </span>
             ) : (
-              "Supported: YouTube (videos, Shorts, live), Vimeo, and .mp4 / .webm / .mov / .ogg files."
+              "Supported: YouTube, Vimeo, and device video uploads. Device file playback depends on the browser's codec support."
             )}
           </p>
         </div>
@@ -111,8 +161,31 @@ export default function VideoEditorDialog({ initial, focus = "title", onSave, on
               <span className="mb-1.5 flex items-center gap-1.5 text-xs font-bold uppercase tracking-[.1em] text-[#536272]">
                 <Link2 size={13} aria-hidden="true" /> Video link
               </span>
-              <input ref={urlRef} type="url" value={form.url} onChange={update("url")} placeholder="Paste a YouTube, Vimeo or .mp4 link" className={input} />
+              <input ref={urlRef} type="url" value={form.url} onChange={update("url")} placeholder="Paste a YouTube, Vimeo or direct video URL" className={input} />
             </label>
+            <div>
+              <input
+                ref={fileRef}
+                type="file"
+                accept="video/*,.3g2,.3gp,.avi,.flv,.m2ts,.m4v,.mkv,.mov,.mpe,.mpeg,.mpg,.mts,.ogv,.ts,.wmv"
+                onChange={selectFile}
+                className="sr-only"
+                aria-label="Choose a video file from this device"
+              />
+              <button type="button" onClick={() => fileRef.current?.click()} disabled={busy} className="inline-flex items-center gap-2 rounded-xl border border-dashed border-[#c9a45c] bg-[#fbf8f0] px-4 py-3 text-sm font-semibold text-[#142536] hover:bg-[#f5eedc] disabled:opacity-60">
+                <Upload size={16} aria-hidden="true" /> Upload video from this device
+              </button>
+              <p className="mt-1.5 text-xs leading-5 text-[#68717a]">Common video formats · up to 5 GB · uploads directly to video storage</p>
+              {selectedFile && (
+                <div className="mt-3 rounded-xl border border-[#e7e2d8] bg-[#fbf8f0] p-3 text-sm">
+                  <div className="flex items-start justify-between gap-3">
+                    <span className="min-w-0 break-all font-medium text-[#142536]">{selectedFile.name}<span className="ml-2 text-xs font-normal text-[#68717a]">{sizeLabel}</span></span>
+                    <button type="button" onClick={() => setSelectedFile(null)} disabled={busy} className="shrink-0 rounded-full p-1 text-[#68717a] hover:bg-white" aria-label="Remove selected video"><X size={16} /></button>
+                  </div>
+                  {busy && <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#e7e2d8]"><div className="h-full bg-[#c9a45c] transition-all" style={{ width: `${uploadProgress}%` }} /></div>}
+                </div>
+              )}
+            </div>
             <label className="block">
               <span className="mb-1.5 block text-xs font-bold uppercase tracking-[.1em] text-[#536272]">Title</span>
               <input ref={titleRef} value={form.title} onChange={update("title")} maxLength={120} placeholder="e.g. Gurgaon project walkthrough" className={input} />
@@ -141,7 +214,7 @@ export default function VideoEditorDialog({ initial, focus = "title", onSave, on
           <div className="mt-6 flex flex-wrap items-center gap-3">
             <button type="submit" disabled={busy} className="inline-flex items-center gap-2 rounded-full bg-[#142536] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#c9a45c] hover:text-[#142536] disabled:opacity-60">
               {busy ? <Loader2 size={16} className="animate-spin" aria-hidden="true" /> : editing ? <Check size={16} aria-hidden="true" /> : <Plus size={16} aria-hidden="true" />}
-              {busy ? "Saving..." : editing ? "Save changes" : "Add video"}
+              {busy ? (selectedFile && uploadProgress < 100 ? `Uploading ${Math.round(uploadProgress)}%` : "Saving...") : editing ? "Save changes" : "Add video"}
             </button>
             <button type="button" onClick={onClose} disabled={busy} className="rounded-full border border-[#d9dce0] px-5 py-3 text-sm font-semibold text-[#142536] hover:border-[#9aa4ad]">
               Cancel

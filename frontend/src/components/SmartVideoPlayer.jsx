@@ -136,6 +136,7 @@ export default function SmartVideoPlayer({ source, title }) {
           className="h-full w-full bg-black object-contain"
           autoPlay
           playsInline
+          preload="metadata"
           controls
           onPlay={() => setPlaying(true)}
           onPause={() => setPlaying(false)}
@@ -211,7 +212,7 @@ export default function SmartVideoPlayer({ source, title }) {
                       </p>
                     </>
                   ) : (
-                    <p>This video plays at its original uploaded quality.</p>
+                    <p>This video keeps its original uploaded quality and scales to fit the player. It does not have lower-quality versions.</p>
                   )}
                 </div>
               )}
