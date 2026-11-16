@@ -24,6 +24,18 @@ export const authApi = {
       body: JSON.stringify({ name, email, phone }),
     }),
 
+  verifyCustomerPhone: (challengeId, code) =>
+    apiRequest("/auth/customer/phone/verify", {
+      method: "POST",
+      body: JSON.stringify({ challenge_id: challengeId, code }),
+    }),
+
+  resendCustomerPhoneCode: (challengeId) =>
+    apiRequest("/auth/customer/phone/resend", {
+      method: "POST",
+      body: JSON.stringify({ challenge_id: challengeId }),
+    }),
+
   customerGoogleLogin: (credential) =>
     apiRequest("/auth/customer/google", {
       method: "POST",

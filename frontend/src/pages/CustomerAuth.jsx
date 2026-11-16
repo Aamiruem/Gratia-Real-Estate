@@ -136,7 +136,10 @@ export default function CustomerAuth() {
     setError("");
     setBusy(true);
     try {
-      await finishSignIn(await authApi.verifyCode(challenge.challenge_id, code.trim()));
+      const result = mode === "signup"
+        ? await authApi.verifyCustomerPhone(challenge.challenge_id, code.trim())
+        : await authApi.verifyCode(challenge.challenge_id, code.trim());
+      await finishSignIn(result);
     } catch (authError) {
       setError(authError.message || "The code could not be verified.");
     } finally {
@@ -148,7 +151,10 @@ export default function CustomerAuth() {
     setError("");
     setBusy(true);
     try {
-      setChallenge(await authApi.resendCode(challenge.challenge_id));
+      const result = mode === "signup"
+        ? await authApi.resendCustomerPhoneCode(challenge.challenge_id)
+        : await authApi.resendCode(challenge.challenge_id);
+      setChallenge(result);
     } catch (authError) {
       setError(authError.message || "Could not resend the code.");
     } finally {

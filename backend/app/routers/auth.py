@@ -298,6 +298,7 @@ def _phone_digest(phone: str) -> str:
 def _consume_customer_sms_budget(db: Session, phone: str) -> None:
     now = datetime.now(timezone.utc)
     hour_ago = now - timedelta(hours=1)
+    db.execute(delete(CustomerSignupChallenge).where(CustomerSignupChallenge.expires_at <= now))
     db.execute(delete(CustomerOtpRateLimit).where(CustomerOtpRateLimit.requested_at < now - timedelta(days=1)))
     phone_hash = _phone_digest(phone)
     phone_count = db.scalar(
@@ -380,8 +381,8 @@ def customer_phone_login(
         raise HTTPException(status_code=404, detail="No account found for this number. Please sign up first.")
     if not user.is_active:
         raise HTTPException(status_code=403, detail="User account is inactive.")
-    _consume_customer_sms_budget(db, phone)
     _enforce_cooldown(user, db)
+    _consume_customer_sms_budget(db, phone)
     return _issue_challenge(user, db, channel="phone", show_code=_is_local_request(request))
 
 
@@ -410,6 +411,30 @@ def customer_phone_signup(
         )
     )
     if pending_signup:
+        if (
+            pending_signup.phone_number == phone
+            and pending_signup.email.lower() == email
+            and pending_signup.name == name
+        ):
+            sent_at = pending_signup.sent_at
+            if sent_at.tzinfo is None:
+                sent_at = sent_at.replace(tzinfo=timezone.utc)
+            expires_at = pending_signup.expires_at
+            if expires_at.tzinfo is None:
+                expires_at = expires_at.replace(tzinfo=timezone.utc)
+            resend_in = max(
+                0,
+                int((sent_at + timedelta(seconds=otp.RESEND_AFTER_SECONDS) - now).total_seconds()),
+            )
+            return {
+                "otp_required": True,
+                "challenge_id": pending_signup.id,
+                "sent_to": otp.mask_phone(phone),
+                "channel": "phone",
+                "delivered_via": "sms",
+                "expires_in_minutes": max(1, int((expires_at - now).total_seconds() // 60)),
+                "resend_after_seconds": resend_in,
+            }
         db.rollback()
         raise HTTPException(status_code=409, detail="A sign-up verification is already pending for these details.")
     db.commit()
@@ -419,6 +444,10 @@ def customer_phone_signup(
 class CustomerSignupVerifyRequest(BaseModel):
     challenge_id: str = Field(min_length=10, max_length=64)
     code: str = Field(pattern=r"^\d{6}$")
+
+
+class CustomerSignupResendRequest(BaseModel):
+    challenge_id: str = Field(min_length=10, max_length=64)
 
 
 def _get_customer_signup_challenge(challenge_id: str, db: Session) -> CustomerSignupChallenge:
@@ -480,7 +509,7 @@ def customer_phone_signup_verify(
 
 @router.post("/customer/phone/resend")
 def customer_phone_signup_resend(
-    data: OtpResendRequest,
+    data: CustomerSignupResendRequest,
     request: Request,
     db: Session = Depends(get_db),
 ):
