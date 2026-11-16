@@ -121,7 +121,7 @@ export default function SmartVideoPlayer({ source, title }) {
     else el?.requestFullscreen?.();
   };
 
-  const controllable = source.type !== "vimeo";
+  const controllable = source.type === "youtube" || source.type === "file";
   const button =
     "grid size-9 place-items-center rounded-full bg-black/60 text-white backdrop-blur transition hover:bg-black/80 disabled:opacity-40";
 
@@ -150,6 +150,16 @@ export default function SmartVideoPlayer({ source, title }) {
           className="h-full w-full"
           allow="autoplay; fullscreen; picture-in-picture"
           allowFullScreen
+        />
+      )}
+      {source.type === "instagram" && (
+        <iframe
+          src={source.src}
+          title={title}
+          className="h-full w-full border-0 bg-white"
+          allow="autoplay; encrypted-media; picture-in-picture; clipboard-write; web-share"
+          allowFullScreen
+          loading="lazy"
         />
       )}
 

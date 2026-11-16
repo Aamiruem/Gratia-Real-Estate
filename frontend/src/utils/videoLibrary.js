@@ -71,6 +71,14 @@ export function getVideoSource(value) {
     const id = url.pathname.split("/").filter(Boolean).find((part) => /^\d+$/.test(part));
     return id ? { type: "vimeo", id, thumbnail: "" } : null;
   }
+  // Instagram only permits embeds for individual posts/Reels, not profile URLs.
+  if (["instagram.com", "instagr.am"].includes(host)) {
+    const segments = url.pathname.split("/").filter(Boolean);
+    if (["reel", "reels", "p", "tv"].includes(segments[0]) && segments[1]) {
+      return { type: "instagram", id: segments[1], src: `https://www.instagram.com/${segments[0]}/${segments[1]}/embed/` };
+    }
+    return null;
+  }
   if (FILE_TYPES.test(url.pathname)) {
     return { type: "file", src: url.href, thumbnail: "" };
   }

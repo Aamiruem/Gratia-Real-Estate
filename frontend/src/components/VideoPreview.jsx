@@ -64,6 +64,9 @@ export default function VideoPreview({ video, videoId, showLogo = true, overlay 
       {source.type === "vimeo" && (
         <span className="absolute inset-0 bg-gradient-to-br from-[#1ab7ea]/40 via-[#142536] to-[#0f1f2e]" aria-hidden="true" />
       )}
+      {source.type === "instagram" && (
+        <span className="absolute inset-0 bg-gradient-to-br from-[#f09433]/45 via-[#dc2743]/30 to-[#bc1888]/50" aria-hidden="true" />
+      )}
       <span className={`absolute inset-0 bg-gradient-to-t ${overlay ? "from-black/85 via-black/20" : "from-[#0d1b2a]/60 via-transparent"} to-transparent transition group-hover:from-black/90`} />
       {overlay && (
         <span className="absolute inset-x-0 bottom-0 p-4 text-left sm:p-5">
@@ -86,7 +89,7 @@ export default function VideoPreview({ video, videoId, showLogo = true, overlay 
         </span>
       )}
       <span className="absolute right-3 top-3 rounded-md bg-black/60 px-2 py-0.5 text-[10px] font-bold tracking-wide text-white">
-        {source.type === "youtube" ? "HD" : source.type === "vimeo" ? "VIMEO" : "VIDEO"}
+        {source.type === "youtube" ? "HD" : source.type === "vimeo" ? "VIMEO" : source.type === "instagram" ? "INSTAGRAM" : "VIDEO"}
       </span>
       <span className="relative flex h-16 w-16 items-center justify-center rounded-full bg-[#c9a45c] text-[#142536] shadow-lg ring-8 ring-white/20 transition group-hover:scale-110">
         <Play size={26} fill="currentColor" aria-hidden="true" />

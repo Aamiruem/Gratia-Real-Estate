@@ -1,9 +1,6 @@
 import { handleUpload } from "@vercel/blob/client";
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024 * 1024;
-const VIDEO_EXTENSIONS = new Set([
-  "3g2", "3gp", "asf", "avi", "f4v", "flv", "gxf", "h264", "h265", "hevc", "m2ts", "m2v", "m4p", "m4v", "mkv", "mov", "mp4", "mpe", "mpeg", "mpegts", "mpg", "mts", "mxf", "ogv", "ts", "vob", "webm", "wmv",
-]);
 
 function assertSameOrigin(req) {
   const origin = req.headers.origin;
@@ -55,8 +52,8 @@ export default async function handler(req, res) {
         await requireVideoAdmin(req);
         const path = String(pathname || "");
         const extension = path.split(".").pop()?.toLowerCase();
-        if (!path.startsWith("project-videos/") || !VIDEO_EXTENSIONS.has(extension)) {
-          const error = new Error("Choose a supported video format.");
+        if (!path.startsWith("project-videos/") || !/^[a-z0-9]{2,10}$/.test(extension || "")) {
+          const error = new Error("Choose a video file with a valid filename.");
           error.statusCode = 400;
           throw error;
         }

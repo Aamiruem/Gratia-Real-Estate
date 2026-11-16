@@ -4,7 +4,7 @@ import { projects } from "../data/projects";
 import { deleteUploadedVideo, getVideoSource, uploadVideoFile } from "../utils/videoLibrary";
 import VideoPreview from "./VideoPreview";
 
-const TYPE_LABEL = { youtube: "YouTube video", vimeo: "Vimeo video", file: "Video file" };
+const TYPE_LABEL = { youtube: "YouTube video", vimeo: "Vimeo video", instagram: "Instagram video", file: "Video file" };
 
 /**
  * One-click add / edit / change-video dialog for the owner, with a live preview.
@@ -21,6 +21,7 @@ export default function VideoEditorDialog({ initial, focus = "title", onSave, on
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
+  const [sourceMode, setSourceMode] = useState(initial?.url || focus === "url" ? "link" : "upload");
   const [uploadProgress, setUploadProgress] = useState(0);
   const titleRef = useRef(null);
   const urlRef = useRef(null);
@@ -56,6 +57,7 @@ export default function VideoEditorDialog({ initial, focus = "title", onSave, on
     const file = event.target.files?.[0] || null;
     event.target.value = "";
     setSelectedFile(file);
+    if (file) setSourceMode("upload");
     if (file) setForm((current) => ({ ...current, url: "" }));
     setUploadProgress(0);
     setError("");
@@ -67,15 +69,18 @@ export default function VideoEditorDialog({ initial, focus = "title", onSave, on
   const submit = async (event) => {
     event.preventDefault();
     if (!form.title.trim()) return setError("Please add a title for this video.");
-    if (!selectedFile && !linkedSource) {
-      return setError("Please paste a YouTube, Vimeo or direct video file link (.mp4, .webm, .mov).");
+    if (sourceMode === "link" && !linkedSource) {
+      return setError("Add a YouTube, Vimeo, Instagram Reel/post, or direct video file URL. Instagram profile links do not identify an individual video.");
+    }
+    if (sourceMode === "upload" && !selectedFile) {
+      return setError("Choose a video from this device to upload.");
     }
     setBusy(true);
     setError("");
     let uploadedUrl = "";
     try {
       let url = form.url.trim();
-      if (selectedFile) {
+      if (sourceMode === "upload" && selectedFile) {
         const blob = await uploadVideoFile(selectedFile, ({ percentage }) => setUploadProgress(percentage));
         url = blob.url;
         uploadedUrl = blob.url;
@@ -123,7 +128,7 @@ export default function VideoEditorDialog({ initial, focus = "title", onSave, on
               <div className="grid h-full place-items-center p-6 text-center text-sm text-white/60">
                 <span>
                   <Film size={30} className="mx-auto mb-2 text-white/40" aria-hidden="true" />
-                  Paste a video link to see it here
+                  {sourceMode === "link" ? "Paste a video link to see it here" : "Choose a video from this device to preview it"}
                 </span>
               </div>
             )}
@@ -134,7 +139,7 @@ export default function VideoEditorDialog({ initial, focus = "title", onSave, on
                 <Check size={13} aria-hidden="true" /> {TYPE_LABEL[source.type]} detected
               </span>
             ) : (
-              "Supported: YouTube, Vimeo, and device video uploads. Device file playback depends on the browser's codec support."
+              "YouTube, Vimeo, Instagram Reel/post links, or a video selected from your device. Playback depends on the browser's codec support."
             )}
           </p>
         </div>
@@ -151,25 +156,29 @@ export default function VideoEditorDialog({ initial, focus = "title", onSave, on
           </div>
 
           <div className="mt-5 space-y-4">
-            <label className="block">
+            <div className="grid grid-cols-2 gap-2 rounded-xl bg-[#f4f1e9] p-1" role="tablist" aria-label="Video source">
+              <button type="button" role="tab" aria-selected={sourceMode === "link"} onClick={() => { setSourceMode("link"); setSelectedFile(null); setError(""); }} className={`rounded-lg px-3 py-2.5 text-sm font-semibold ${sourceMode === "link" ? "bg-white text-[#142536] shadow-sm" : "text-[#68717a]"}`}><Link2 size={15} className="mr-1.5 inline" />Add a link</button>
+              <button type="button" role="tab" aria-selected={sourceMode === "upload"} onClick={() => { setSourceMode("upload"); setForm((current) => ({ ...current, url: "" })); setError(""); }} className={`rounded-lg px-3 py-2.5 text-sm font-semibold ${sourceMode === "upload" ? "bg-white text-[#142536] shadow-sm" : "text-[#68717a]"}`}><Upload size={15} className="mr-1.5 inline" />Upload a file</button>
+            </div>
+            {sourceMode === "link" && <label className="block">
               <span className="mb-1.5 flex items-center gap-1.5 text-xs font-bold uppercase tracking-[.1em] text-[#536272]">
                 <Link2 size={13} aria-hidden="true" /> Video link
               </span>
-              <input ref={urlRef} type="url" value={form.url} onChange={update("url")} placeholder="Paste a YouTube, Vimeo or direct video URL" className={input} />
-            </label>
-            <div>
+              <input ref={urlRef} type="url" value={form.url} onChange={update("url")} placeholder="YouTube, Vimeo, Instagram Reel, or direct video URL" className={input} />
+            </label>}
+            {sourceMode === "upload" && <div>
               <input
                 ref={fileRef}
                 type="file"
-                accept="video/*,.3g2,.3gp,.avi,.flv,.m2ts,.m4v,.mkv,.mov,.mpe,.mpeg,.mpg,.mts,.ogv,.ts,.wmv"
+                accept="video/*"
                 onChange={selectFile}
                 className="sr-only"
                 aria-label="Choose a video file from this device"
               />
               <button type="button" onClick={() => fileRef.current?.click()} disabled={busy} className="inline-flex items-center gap-2 rounded-xl border border-dashed border-[#c9a45c] bg-[#fbf8f0] px-4 py-3 text-sm font-semibold text-[#142536] hover:bg-[#f5eedc] disabled:opacity-60">
-                <Upload size={16} aria-hidden="true" /> Upload video from this device
+                <Upload size={16} aria-hidden="true" /> Choose video from this device
               </button>
-              <p className="mt-1.5 text-xs leading-5 text-[#68717a]">Common video formats · up to 5 GB · uploads directly to video storage</p>
+              <p className="mt-1.5 text-xs leading-5 text-[#68717a]">Select a video from your computer, Android, or iPhone · up to 5 GB · uploads directly to video storage</p>
               {selectedFile && (
                 <div className="mt-3 rounded-xl border border-[#e7e2d8] bg-[#fbf8f0] p-3 text-sm">
                   <div className="flex items-start justify-between gap-3">
@@ -179,7 +188,7 @@ export default function VideoEditorDialog({ initial, focus = "title", onSave, on
                   {busy && <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#e7e2d8]"><div className="h-full bg-[#c9a45c] transition-all" style={{ width: `${uploadProgress}%` }} /></div>}
                 </div>
               )}
-            </div>
+            </div>}
             <label className="block">
               <span className="mb-1.5 block text-xs font-bold uppercase tracking-[.1em] text-[#536272]">Title</span>
               <input ref={titleRef} value={form.title} onChange={update("title")} maxLength={120} placeholder="e.g. Gurgaon project walkthrough" className={input} />
