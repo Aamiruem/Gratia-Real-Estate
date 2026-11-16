@@ -240,19 +240,35 @@ export default function InstallAppButton({ variant = "header", className = "" })
   // Inside the installed app there is nothing to install.
   if (standalone) return null;
 
+  const install = async () => {
+    try {
+      const outcome = await promptInstall();
+      if (outcome === "unavailable") {
+        setOpen(true);
+        return;
+      }
+      setOpen(false);
+      if (outcome === "accepted") toast("Gratia Estates is being installed.");
+      else toast("Install was cancelled. You can try again any time.", "info");
+    } catch {
+      setOpen(true);
+      toast("Your browser could not open the install prompt. Follow the device steps instead.", "info");
+    }
+  };
+
   const onClick = () => {
     track("install_click", { detail: canPrompt ? "prompt" : "instructions" });
     if (installed && !canPrompt) {
       toast("Gratia Estates is already installed. Open it from your home screen or apps.", "info");
       return;
     }
+    // Use the one-time browser install prompt immediately from the user gesture.
+    // iOS and browsers without this API still get the correct device guide.
+    if (canPrompt) {
+      void install();
+      return;
+    }
     setOpen(true);
-  };
-
-  const install = async () => {
-    const outcome = await promptInstall();
-    setOpen(false);
-    if (outcome === "accepted") toast("Gratia Estates is being installed.");
   };
 
   return (
