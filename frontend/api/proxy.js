@@ -113,6 +113,9 @@ export default async function handler(req, res) {
       path,
       backendHost,
       error: error instanceof Error ? `${error.name}: ${error.message}` : "Unknown fetch error",
+      cause: error?.cause instanceof Error
+        ? `${error.cause.name}: ${error.cause.message}${error.cause.code ? ` (${error.cause.code})` : ""}`
+        : undefined,
     });
     res.status(502).json({ detail: "The API server did not respond. It may be starting up; please try again in a moment." });
     return;
