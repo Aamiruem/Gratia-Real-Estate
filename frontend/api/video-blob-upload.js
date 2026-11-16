@@ -2,7 +2,7 @@ import { handleUpload } from "@vercel/blob/client";
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024 * 1024;
 const VIDEO_EXTENSIONS = new Set([
-  "3g2", "3gp", "asf", "avi", "f4v", "flv", "gxf", "h264", "h265", "hevc", "m2ts", "m2v", "m4p", "m4v", "mkv", "mov", "mpe", "mpeg", "mpegts", "mpg", "mts", "mxf", "ogv", "ts", "vob", "webm", "wmv",
+  "3g2", "3gp", "asf", "avi", "f4v", "flv", "gxf", "h264", "h265", "hevc", "m2ts", "m2v", "m4p", "m4v", "mkv", "mov", "mp4", "mpe", "mpeg", "mpegts", "mpg", "mts", "mxf", "ogv", "ts", "vob", "webm", "wmv",
 ]);
 
 function assertSameOrigin(req) {

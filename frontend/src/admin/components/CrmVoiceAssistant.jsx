@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Headphones, Loader2, Mic, MicOff, Send, X } from "lucide-react";
+import { Headphones, Loader2, Mic, MicOff, Phone, RefreshCw, Send, X } from "lucide-react";
 import { adminApi } from "../api";
 
 const greeting = {
@@ -10,6 +10,9 @@ const greeting = {
 export default function CrmVoiceAssistant() {
   const [open, setOpen] = useState(false);
   const [status, setStatus] = useState(null);
+  const [calls, setCalls] = useState([]);
+  const [callsLoading, setCallsLoading] = useState(false);
+  const [callsError, setCallsError] = useState("");
   const [messages, setMessages] = useState([greeting]);
   const [draft, setDraft] = useState("");
   const [proposal, setProposal] = useState(null);
@@ -26,6 +29,31 @@ export default function CrmVoiceAssistant() {
       window.speechSynthesis?.cancel();
     };
   }, []);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    let active = true;
+    const refreshCalls = async () => {
+      setCallsLoading(true);
+      try {
+        const result = await adminApi.crmVoiceCalls();
+        if (active) {
+          setCalls(result.items || []);
+          setCallsError("");
+        }
+      } catch (requestError) {
+        if (active) setCallsError(requestError.message || "Could not load recent calls.");
+      } finally {
+        if (active) setCallsLoading(false);
+      }
+    };
+    refreshCalls();
+    const timer = window.setInterval(refreshCalls, 30_000);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
+  }, [open]);
 
   useEffect(() => {
     bottom.current?.scrollIntoView({ behavior: "smooth" });
@@ -146,6 +174,29 @@ export default function CrmVoiceAssistant() {
                 Configure <code>OPENAI_API_KEY</code> on the backend and enable the AI assistant in Admin settings to use CRM answers. Your question is not sent until that service is enabled.
               </p>
             )}
+
+            <section className="border-b border-[#e7e2d8] px-4 py-3" aria-label="Recent AI calls">
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <h3 className="flex items-center gap-2 text-sm font-bold text-[#142536]"><Phone size={15} aria-hidden="true" /> Recent calls</h3>
+                <button type="button" onClick={() => { setCallsError(""); adminApi.crmVoiceCalls().then((result) => setCalls(result.items || []), (requestError) => setCallsError(requestError.message || "Could not load recent calls.")); }} disabled={callsLoading} className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#80602b] disabled:opacity-50" aria-label="Refresh call history">
+                  <RefreshCw size={13} className={callsLoading ? "animate-spin" : ""} aria-hidden="true" /> Refresh
+                </button>
+              </div>
+              {callsError ? <p role="alert" className="text-xs text-rose-700">{callsError}</p> : calls.length ? (
+                <ul className="max-h-36 space-y-2 overflow-y-auto">
+                  {calls.slice(0, 8).map((call) => (
+                    <li key={call.call_id} className="rounded-xl bg-[#fbfaf7] px-3 py-2 text-xs text-[#536272]">
+                      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+                        <span className="font-semibold text-[#142536]">{call.lead_reference || "Unmatched caller"} · {call.direction || "call"}</span>
+                        <span className="capitalize">{String(call.status || "unknown").replaceAll("_", " ")}</span>
+                      </div>
+                      <p className="mt-0.5">{call.created_at ? new Date(call.created_at).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" }) : "Time unavailable"}</p>
+                      {call.summary && <p className="mt-1 line-clamp-2 text-[#142536]">{call.summary}</p>}
+                    </li>
+                  ))}
+                </ul>
+              ) : <p className="text-xs text-[#68717a]">{callsLoading ? "Checking for call activity…" : "Call activity appears here automatically."}</p>}
+            </section>
 
             <div className="min-h-40 flex-1 space-y-3 overflow-y-auto bg-[#f7f4ed] px-4 py-4" aria-live="polite">
               {messages.map((message, index) => (
