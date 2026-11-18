@@ -1,3 +1,23 @@
+import subprocess
+import sys
+
+
+def test_prediction_metadata_does_not_import_model_runtime_libraries():
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "import sys; from app.predictor.service import get_options; get_options(); "
+            "assert 'pandas' not in sys.modules and 'joblib' not in sys.modules",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+
+
 def test_prediction_options_and_metrics_are_public(client):
     options = client.get("/predictions/options")
     metrics = client.get("/predictions/metrics")
