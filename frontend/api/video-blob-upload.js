@@ -68,6 +68,10 @@ export default async function handler(req, res) {
     res.setHeader("Cache-Control", "no-store");
     res.status(200).json(result);
   } catch (error) {
+    console.error("Video Blob upload authorization failed", {
+      statusCode: error.statusCode || 400,
+      message: error instanceof Error ? error.message : "Unknown authorization error",
+    });
     res.status(error.statusCode || 400).json({ detail: error.message || "The upload could not be authorized." });
   }
 }

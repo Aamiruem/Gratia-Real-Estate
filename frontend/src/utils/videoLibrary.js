@@ -108,6 +108,40 @@ function createUploadId() {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
 }
 
+async function getUploadTokenFailureDetail(pathname, multipart) {
+  let response;
+  try {
+    response = await fetch("/api/video-blob-upload", {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Requested-With": "fetch",
+      },
+      body: JSON.stringify({
+        type: "blob.generate-client-token",
+        payload: { pathname, clientPayload: null, multipart },
+      }),
+    });
+  } catch {
+    return "Could not reach video storage. Check your connection and try again.";
+  }
+
+  let result;
+  try {
+    result = await response.json();
+  } catch {
+    return `Video storage returned an invalid response (HTTP ${response.status}). Refresh the page and try again.`;
+  }
+  if (!response.ok) {
+    return result?.detail || `Video storage could not authorize this upload (HTTP ${response.status}).`;
+  }
+  if (typeof result?.clientToken !== "string" || !result.clientToken.startsWith("vercel_blob_client_")) {
+    return "Video storage did not return a usable upload token. Ask an administrator to check the Blob storage configuration.";
+  }
+  return "Video storage authorized the upload, but the browser could not read the token. Refresh the page and try again.";
+}
+
 export async function uploadVideoFile(file, onProgress) {
   const extension = String(file.name.split(".").pop() || "").toLowerCase();
   if (!file.type.startsWith("video/") && !VIDEO_EXTENSIONS.has(extension)) {
@@ -124,14 +158,32 @@ export async function uploadVideoFile(file, onProgress) {
     .replace(/^-|-$/g, "")
     .slice(-120) || `video.${extension || "bin"}`;
 
-  return upload(`project-videos/${createUploadId()}-${safeName}`, file, {
+  const pathname = `project-videos/${createUploadId()}-${safeName}`;
+  const multipart = file.size > 100 * 1024 * 1024;
+  const options = {
     access: "public",
     contentType: VIDEO_CONTENT_TYPES[extension] || file.type || "application/octet-stream",
     handleUploadUrl: "/api/video-blob-upload",
     headers: { "X-Requested-With": "fetch" },
-    multipart: file.size > 100 * 1024 * 1024,
+    multipart,
     onUploadProgress: onProgress,
-  });
+  };
+
+  try {
+    return await upload(pathname, file, options);
+  } catch (error) {
+    if (!(error instanceof Error) || !/failed to\s+retrieve the client token/i.test(error.message)) {
+      throw error;
+    }
+    try {
+      return await upload(pathname, file, options);
+    } catch (retryError) {
+      if (!(retryError instanceof Error) || !/failed to\s+retrieve the client token/i.test(retryError.message)) {
+        throw retryError;
+      }
+      throw new Error(await getUploadTokenFailureDetail(pathname, multipart));
+    }
+  }
 }
 
 export async function deleteUploadedVideo(url) {
