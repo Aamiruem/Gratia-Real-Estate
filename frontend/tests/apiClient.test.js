@@ -56,8 +56,7 @@ test("does not refresh the session for authentication requests", async () => {
 test("announces an expired session when refresh is rejected", async () => {
   const events = [];
   globalThis.window = { dispatchEvent: (event) => events.push(event.type) };
-  globalThis.fetch = async (url) =>
-    jsonResponse(url.endsWith("/auth/refresh") ? 401 : 401, { detail: "Authentication required" });
+  globalThis.fetch = async () => jsonResponse(401, { detail: "Authentication required" });
 
   await assert.rejects(apiRequest("/admin/crm/voice/calls"), (error) => error.status === 401);
   assert.deepEqual(events, [SESSION_EXPIRED_EVENT]);
