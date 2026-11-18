@@ -62,7 +62,7 @@ export default async function handler(req, res) {
     await videoBlobUpload(req, res);
     return;
   }
-  if (path === "video-blob-delete" || (typeof body?.url === "string" && body.url.includes(".public.blob.vercel-storage.com/project-videos/"))) {
+  if (path === "video-blob-delete") {
     if (!body || typeof body !== "object") {
       res.status(400).json({ detail: "The delete request body must be valid JSON." });
       return;
