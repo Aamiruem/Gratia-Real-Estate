@@ -6,7 +6,6 @@ import json
 import threading
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parent
 MODEL_PATH = ROOT / "model" / "price_model.joblib"
 METADATA_PATH = ROOT / "model" / "metadata.json"
