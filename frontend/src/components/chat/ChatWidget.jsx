@@ -61,7 +61,7 @@ export default function ChatWidget() {
     }
     window.speechSynthesis.cancel();
     const reply = new window.SpeechSynthesisUtterance(text);
-    reply.lang = voiceLanguage;
+    reply.lang = /[\u0900-\u097f]/.test(text) ? "hi-IN" : "en-IN";
     window.speechSynthesis.speak(reply);
   };
 
@@ -250,7 +250,8 @@ export default function ChatWidget() {
               onClick={() => (listening ? recognitionRef.current?.stop() : startListening())}
               aria-label={listening ? "Stop voice input" : "Ask by voice"}
               title={listening ? "Stop listening" : "Ask by voice"}
-              className={`grid size-10 shrink-0 place-items-center rounded-full ${listening ? "bg-rose-100 text-rose-800" : "bg-[#f3ead8] text-[#142536]"}`}
+              disabled={typing}
+              className={`grid size-10 shrink-0 place-items-center rounded-full disabled:opacity-40 ${listening ? "bg-rose-100 text-rose-800" : "bg-[#f3ead8] text-[#142536]"}`}
             >
               {listening ? <MicOff size={17} aria-hidden="true" /> : <Mic size={17} aria-hidden="true" />}
             </button>

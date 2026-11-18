@@ -4,10 +4,11 @@ import pytest
 
 from app import ratelimit
 from app import automated_calls
-from app.automated_calls import run_scheduled_calls
+from app.automated_calls import enqueue_automated_call, run_scheduled_calls
 from app.database import SessionLocal, create_tables
-from app.models import AutomatedCallJob, Lead, VoiceCall
+from app.models import AutomatedCallJob, Lead, Property, VoiceCall
 from app.retell import RetellCallError
+from app import retell
 
 
 @pytest.fixture(autouse=True)
@@ -21,21 +22,48 @@ def clear_call_state():
         db.commit()
 
 
-def create_consented_lead(client, **overrides):
-    body = {
+def create_consented_lead(**overrides):
+    fields = {
         "kind": "callback",
+        "status": "new",
+        "reference": "GE-261105-VOICE",
         "name": "Riya Sharma",
-        "phone": "98765 43210",
+        "phone": "+919876543210",
         "call_consent": True,
+        "call_consent_at": datetime(2026, 1, 5, 4, 29, tzinfo=timezone.utc),
+        "contact_time": None,
     }
-    body.update(overrides)
-    response = client.post("/leads", json=body)
-    assert response.status_code == 201, response.text
+    fields.update(overrides)
     with SessionLocal() as db:
-        job = db.query(AutomatedCallJob).one()
+        lead = Lead(**fields)
+        db.add(lead)
+        db.flush()
+        job = enqueue_automated_call(db, lead)
+        assert job is not None
         job.scheduled_at = datetime(2026, 1, 5, 4, 29, tzinfo=timezone.utc)
         db.commit()
         return job.id
+
+
+def test_enqueue_reuses_job_for_same_consent_timestamp():
+    with SessionLocal() as db:
+        lead = Lead(
+            kind="callback",
+            status="new",
+            reference="GE-261105-VOICE",
+            name="Riya Sharma",
+            phone="+919876543210",
+            call_consent=True,
+            call_consent_at=datetime(2026, 1, 5, 4, 29, tzinfo=timezone.utc),
+        )
+        db.add(lead)
+        db.flush()
+        first = enqueue_automated_call(db, lead)
+        second = enqueue_automated_call(db, lead)
+
+        assert first is not None and second is not None
+        assert first.id == second.id
+        assert db.query(AutomatedCallJob).count() == 1
 
 
 def configure_scheduler(monkeypatch, start_call):
@@ -45,9 +73,9 @@ def configure_scheduler(monkeypatch, start_call):
     monkeypatch.setattr(automated_calls, "create_retell_phone_call", start_call)
 
 
-def test_scheduler_waits_until_ist_business_hours_and_starts_once(client, monkeypatch):
+def test_scheduler_waits_until_ist_business_hours_and_starts_once(monkeypatch):
     ratelimit.reset()
-    job_id = create_consented_lead(client)
+    job_id = create_consented_lead()
     calls = []
 
     def fake_start(_db, lead, *, idempotency_key, automated):
@@ -74,9 +102,9 @@ def test_scheduler_waits_until_ist_business_hours_and_starts_once(client, monkey
     assert len(calls) == 1 and calls[0][2] is True
 
 
-def test_scheduler_honors_requested_contact_window(client, monkeypatch):
+def test_scheduler_honors_requested_contact_window(monkeypatch):
     ratelimit.reset()
-    create_consented_lead(client, contact_time="Afternoon (12 PM – 4 PM)")
+    create_consented_lead(contact_time="Afternoon (12 PM – 4 PM)")
     calls = []
 
     def fake_start(_db, lead, **_kwargs):
@@ -96,9 +124,9 @@ def test_scheduler_honors_requested_contact_window(client, monkeypatch):
     assert len(calls) == 1
 
 
-def test_scheduler_retries_transient_retell_error_with_same_idempotency_key(client, monkeypatch):
+def test_scheduler_retries_transient_retell_error_with_same_idempotency_key(monkeypatch):
     ratelimit.reset()
-    create_consented_lead(client)
+    create_consented_lead()
     keys = []
 
     def fail_once(_db, _lead, *, idempotency_key, **_kwargs):
@@ -124,9 +152,9 @@ def test_scheduler_retries_transient_retell_error_with_same_idempotency_key(clie
     assert len(keys) == 2 and keys[0] == keys[1]
 
 
-def test_scheduler_cancels_call_when_consent_is_withdrawn(client, monkeypatch):
+def test_scheduler_cancels_call_when_consent_is_withdrawn(monkeypatch):
     ratelimit.reset()
-    job_id = create_consented_lead(client)
+    job_id = create_consented_lead()
     calls = []
 
     def fake_start(*_args, **_kwargs):
@@ -145,3 +173,101 @@ def test_scheduler_cancels_call_when_consent_is_withdrawn(client, monkeypatch):
         assert run_scheduled_calls(db, datetime(2026, 1, 5, 4, 30, tzinfo=timezone.utc)) == 0
         assert job.status == "cancelled"
     assert calls == []
+
+
+def test_scheduler_recovers_recent_stale_claim_with_same_idempotency_key(monkeypatch):
+    ratelimit.reset()
+    job_id = create_consented_lead()
+    with SessionLocal() as db:
+        job = db.get(AutomatedCallJob, job_id)
+        assert job is not None
+        job.status = "processing"
+        job.attempt_count = 1
+        job.claimed_at = datetime(2026, 1, 5, 4, 30, tzinfo=timezone.utc)
+        original_key = job.idempotency_key
+        db.commit()
+
+    calls = []
+
+    def fake_start(_db, lead, *, idempotency_key, automated):
+        calls.append((idempotency_key, automated))
+        return {
+            "call_id": "retell-recovered-call",
+            "call_status": "registered",
+            "from_number": "+911111111111",
+            "to_number": lead.phone,
+        }
+
+    configure_scheduler(monkeypatch, fake_start)
+    with SessionLocal() as db:
+        assert run_scheduled_calls(db, datetime(2026, 1, 5, 4, 45, tzinfo=timezone.utc)) == 1
+        job = db.get(AutomatedCallJob, job_id)
+        assert job is not None and job.status == "started"
+        assert job.idempotency_key == original_key
+        assert job.attempt_count == 2
+    assert calls == [(original_key, True)]
+
+
+def test_scheduler_does_not_retry_stale_claim_after_idempotency_window(monkeypatch):
+    ratelimit.reset()
+    job_id = create_consented_lead()
+    with SessionLocal() as db:
+        job = db.get(AutomatedCallJob, job_id)
+        assert job is not None
+        job.status = "processing"
+        job.attempt_count = 1
+        job.claimed_at = datetime(2026, 1, 5, 4, 30, tzinfo=timezone.utc)
+        db.commit()
+
+    calls = []
+
+    def fake_start(*_args, **_kwargs):
+        calls.append(True)
+        raise AssertionError("An uncertain call must not be retried after idempotency expires.")
+
+    configure_scheduler(monkeypatch, fake_start)
+    with SessionLocal() as db:
+        assert run_scheduled_calls(db, datetime(2026, 1, 5, 5, 30, tzinfo=timezone.utc)) == 0
+        job = db.get(AutomatedCallJob, job_id)
+        assert job is not None and job.status == "failed"
+        assert "review it before retrying" in job.last_error
+    assert calls == []
+
+
+def test_retell_context_contains_published_properties_only(monkeypatch):
+    settings = {
+        "RETELL_AGENT_ID": "test-agent",
+        "RETELL_PHONE_NUMBER": "+911111111111",
+        "OWNER_PHONE_NUMBER": "+919876543210",
+    }
+    monkeypatch.setattr(retell.config, "env", lambda name, default="": settings.get(name, default))
+    with SessionLocal() as db:
+        lead = Lead(
+            reference="GE-261105-VOICE",
+            kind="callback",
+            status="new",
+            name="Riya Sharma",
+            phone="+919876543210",
+        )
+        db.add_all(
+            [
+                lead,
+                Property(slug="published-test-home", name="Published Test Home", location="Sector 1"),
+                Property(
+                    slug="unpublished-test-home",
+                    name="Unpublished Test Home",
+                    location="Sector 2",
+                    published=False,
+                ),
+            ]
+        )
+        db.flush()
+        payload = retell.build_call_payload(db, lead, idempotency_key="test-key", automated=True)
+
+        assert payload["to_number"] == lead.phone
+        assert payload["metadata"]["automated_follow_up"] is True
+        variables = payload["retell_llm_dynamic_variables"]
+        assert "Published Test Home" in variables["published_properties"]
+        assert "Unpublished Test Home" not in variables["published_properties"]
+        assert variables["human_handoff_number"] == "+919876543210"
+        db.rollback()

@@ -18,6 +18,7 @@ MAX_CALLS_PER_RUN = 5
 MAX_ATTEMPTS = 3
 RETRY_DELAY = timedelta(minutes=15)
 STALE_CLAIM_AGE = timedelta(minutes=10)
+MAX_IDEMPOTENCY_AGE = timedelta(minutes=55)
 
 
 def _utc(value: datetime) -> datetime:
@@ -28,6 +29,7 @@ def enqueue_automated_call(db: Session, lead: Lead) -> AutomatedCallJob | None:
     if not lead.call_consent or lead.call_consent_at is None:
         return None
 
+    db.flush()
     consent_at = _utc(lead.call_consent_at)
     existing = db.scalar(
         select(AutomatedCallJob).where(
@@ -118,6 +120,14 @@ def _recover_stale_claims(db: Session, now: datetime) -> None:
         )
     ).all()
     for job in jobs:
+        if job.claimed_at is None:
+            continue
+        claim_age = now - _utc(job.claimed_at)
+        if claim_age >= MAX_IDEMPOTENCY_AGE or job.attempt_count >= MAX_ATTEMPTS:
+            job.status = "failed"
+            job.claimed_at = None
+            job.last_error = "Call status is unknown; review it before retrying to avoid a duplicate call."
+            continue
         job.status = "queued"
         job.scheduled_at = now
         job.claimed_at = None

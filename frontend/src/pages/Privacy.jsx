@@ -20,7 +20,7 @@ const privacySections = [
     title: "Communication and consent",
     body: [
       "When you submit an enquiry, call us, email us or contact us through WhatsApp, we may contact you about that property requirement. Submitting an enquiry alone does not enroll you in automated AI calls.",
-      "We schedule an automated AI follow-up call only when you select the separate, optional consent checkbox on a form. Calls are limited to Monday–Saturday, 10 AM–7 PM India time. You may withdraw consent or ask us to stop follow-up communication at any time using the contact details below.",
+      "We schedule an automated AI follow-up call only after your explicit consent is recorded, either through the separate, optional form checkbox or when you directly ask our team to arrange one. Calls are limited to Monday–Saturday, 10 AM–7 PM India time. You may withdraw consent or ask us to stop follow-up communication at any time using the contact details below.",
       "If you use voice input in the website assistant, your browser's speech service processes the audio and the resulting text is sent to our website to answer your question. You can type instead.",
     ],
   },
@@ -28,7 +28,7 @@ const privacySections = [
     title: "Sharing of information",
     body: [
       "We do not sell your personal information. We may share relevant enquiry details with trusted team members, channel partners, developers or service providers only when needed to respond to your request, arrange a visit or provide project information.",
-      "If you opt in to an AI phone call, your name, phone number and relevant published property details are sent to our voice-service provider, Retell AI, to place and handle that call. Call audio and call metadata may be processed under the provider's settings and privacy terms.",
+      "For an AI phone call you request or consent to, your name, phone number and relevant published property details are sent to our voice-service provider, Retell AI, to place and handle that call. If you call our Retell-powered number, the provider processes the call and information you choose to share. Call audio and metadata may be processed under the provider's settings and privacy terms.",
       "We may disclose information if required by law, regulation, legal process or a lawful request from a government authority.",
     ],
   },

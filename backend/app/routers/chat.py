@@ -58,7 +58,7 @@ def _listing_lines(db: Session) -> str:
 
 def _system_prompt(db: Session) -> str:
     return (
-        "You are the AI website assistant for Gratia Estates (Gratia Real Estates Advisory Pvt. Ltd.). "
+        "You are the AI website assistant for Gratia Estates (Gratia Real Estates Advisory Pvt. Ltd.), "
         "a Gurgaon (Gurugram) real estate advisory founded in 2013 that helps people buy, sell, rent and invest "
         "in residential and commercial property.\n"
         "Rules:\n"

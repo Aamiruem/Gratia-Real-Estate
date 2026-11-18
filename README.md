@@ -97,6 +97,9 @@ Saturday between 10 AM and 7 PM IST, and honors the lead's requested morning,
 afternoon or evening window. Jobs use Retell idempotency, retry transient
 failures, recheck consent before dialing, and appear in CRM call history.
 Configure the Retell credentials for both the API and Cron services in Render.
+Set `OWNER_PHONE_NUMBER` in E.164 format (for example `+919109776155`) and
+configure the Retell agent's call-transfer tool to use
+`human_handoff_number`; otherwise the agent should offer a callback instead.
 
 Use this behavior in the Retell agent prompt (the API supplies
 `customer_name`, `property_name`, `lead_reference`, `published_properties`,
@@ -104,9 +107,10 @@ Use this behavior in the Retell agent prompt (the API supplies
 calls): disclose that you are an AI, speak Hindi or English to match the
 customer, answer only from the supplied published property facts, and never
 guess prices or availability. During business hours, offer a warm transfer to
-`human_handoff_number` when asked for a person; otherwise collect a callback
-request. For inbound calls, keep the Retell knowledge base synchronized with
-published listings and enable the same language, disclosure and handoff rules.
+`human_handoff_number` when asked for a person and the transfer tool is
+configured; otherwise collect a callback request. For inbound calls, keep the
+Retell knowledge base synchronized with published listings and enable the same
+language, disclosure and handoff rules.
 Never configure the agent to call a lead without recorded consent. Store
 provider credentials in the hosting dashboard, never in source control.
 
