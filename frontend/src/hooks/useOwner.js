@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { authApi } from "../services/authApi";
+import { SESSION_EXPIRED_EVENT } from "../services/apiClient";
 
 // Shared "is the signed-in user the video owner?" state for the whole site.
 // Pages announce sign-in / sign-out with notifyAuthChanged() so the header
@@ -7,6 +8,7 @@ import { authApi } from "../services/authApi";
 const EVENT = "gratia-auth-changed";
 let cached = null; // { checked, isOwner, user }
 let inflight = null;
+let sessionExpired = false;
 
 async function check() {
   try {
@@ -27,6 +29,7 @@ async function check() {
 }
 
 export function notifyAuthChanged() {
+  sessionExpired = false;
   cached = null;
   inflight = null;
   window.dispatchEvent(new Event(EVENT));
@@ -41,11 +44,20 @@ export default function useOwner() {
       inflight = inflight ?? check();
       inflight.then((result) => active && setState(result));
     };
+    const expireSession = () => {
+      if (sessionExpired) return;
+      sessionExpired = true;
+      cached = null;
+      inflight = null;
+      refresh();
+    };
     if (!cached) refresh();
     window.addEventListener(EVENT, refresh);
+    window.addEventListener(SESSION_EXPIRED_EVENT, expireSession);
     return () => {
       active = false;
       window.removeEventListener(EVENT, refresh);
+      window.removeEventListener(SESSION_EXPIRED_EVENT, expireSession);
     };
   }, []);
 

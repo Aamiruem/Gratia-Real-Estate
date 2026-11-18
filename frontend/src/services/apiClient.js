@@ -4,9 +4,48 @@
 //   - VPS/Docker:  Caddy forwards /api -> the api container (Caddyfile)
 // Same-origin calls mean no CORS problems and cookies "just work".
 // Set VITE_API_URL only to call a backend on another origin directly.
-const apiUrl = (import.meta.env.VITE_API_URL || "/api").trim().replace(/\/+$/, "");
+const apiUrl = (import.meta.env?.VITE_API_URL || "/api").trim().replace(/\/+$/, "");
+export const SESSION_EXPIRED_EVENT = "gratia-session-expired";
 
 export const backendUrl = apiUrl;
+let refreshInFlight = null;
+
+async function refreshSession() {
+  if (!refreshInFlight) {
+    refreshInFlight = fetch(`${apiUrl}/auth/refresh`, {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        Accept: "application/json",
+        "X-Requested-With": "fetch",
+      },
+    })
+      .then((response) => (response.ok ? "refreshed" : response.status === 401 ? "expired" : "unavailable"))
+      .catch(() => "unavailable")
+      .finally(() => {
+        refreshInFlight = null;
+      });
+  }
+  return refreshInFlight;
+}
+
+function requestOptions(options = {}) {
+  return {
+    ...options,
+    credentials: "include",
+    headers: {
+      ...(options.body ? { "Content-Type": "application/json" } : {}),
+      Accept: "application/json",
+      // The API requires this header for signed-in writes.
+      "X-Requested-With": "fetch",
+      ...options.headers,
+    },
+  };
+}
+
+function isAuthRequest(path) {
+  return path === "/auth" || path.startsWith("/auth/");
+}
 
 function errorMessageFor(status, data) {
   const detail = data?.detail;
@@ -21,25 +60,30 @@ function errorMessageFor(status, data) {
 export async function apiRequest(path, options = {}) {
   let response;
   try {
-    response = await fetch(`${apiUrl}${path}`, {
-      ...options,
-      credentials: "include",
-      headers: {
-        ...(options.body ? { "Content-Type": "application/json" } : {}),
-        Accept: "application/json",
-        // CSRF protection: the API refuses signed-in writes without this header.
-        "X-Requested-With": "fetch",
-        ...options.headers,
-      },
-    });
+    response = await fetch(`${apiUrl}${path}`, requestOptions(options));
   } catch {
     const error = new Error(
-      import.meta.env.DEV
+      import.meta.env?.DEV
         ? 'Cannot reach the backend. Start it with start-backend.bat (or "uvicorn app.main:app --reload --port 8000" in /backend), then try again.'
         : "We couldn't reach the server. Check your connection and try again.",
     );
     error.status = 0;
     throw error;
+  }
+
+  if (response.status === 401 && !isAuthRequest(path)) {
+    const refreshResult = await refreshSession();
+    if (refreshResult === "refreshed") {
+      try {
+        response = await fetch(`${apiUrl}${path}`, requestOptions(options));
+      } catch {
+        const error = new Error("We couldn't reach the server. Check your connection and try again.");
+        error.status = 0;
+        throw error;
+      }
+    } else if (refreshResult === "expired" && typeof window !== "undefined") {
+      window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
+    }
   }
 
   if (response.status === 204) return null;
