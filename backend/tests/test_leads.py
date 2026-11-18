@@ -4,13 +4,15 @@ import pytest
 
 from app import ratelimit
 from app.database import SessionLocal
-from app.models import Lead, Notification
+from app.models import AutomatedCallJob, Lead, Notification, VoiceCall
 
 
 @pytest.fixture(autouse=True)
 def clean_state(client):
     ratelimit.reset()
     with SessionLocal() as db:
+        db.query(AutomatedCallJob).delete()
+        db.query(VoiceCall).delete()
         db.query(Lead).delete()
         db.query(Notification).delete()
         db.commit()
@@ -65,6 +67,24 @@ def test_duplicate_submission_returns_same_reference(client):
     assert second.json()["reference"] == first.json()["reference"]
     with SessionLocal() as db:
         assert db.query(Lead).count() == 1
+
+
+def test_call_consent_is_optional_and_duplicate_opt_in_queues_once(client):
+    first = client.post("/leads", json=visit())
+    assert first.status_code == 201
+    with SessionLocal() as db:
+        assert db.query(AutomatedCallJob).count() == 0
+
+    opted_in = client.post("/leads", json=visit(call_consent=True))
+    repeated = client.post("/leads", json=visit(call_consent=True))
+
+    assert opted_in.status_code == 200 and opted_in.json()["duplicate"] is True
+    assert repeated.status_code == 200 and repeated.json()["reference"] == first.json()["reference"]
+    with SessionLocal() as db:
+        lead = db.query(Lead).one()
+        assert lead.call_consent is True
+        assert lead.call_consent_at is not None
+        assert db.query(AutomatedCallJob).count() == 1
 
 
 @pytest.mark.parametrize(

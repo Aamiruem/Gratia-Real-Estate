@@ -64,6 +64,7 @@ const empty = {
   property_type: "",
   contact_time: "",
   message: "",
+  call_consent: false,
   website: "",
 };
 
@@ -130,7 +131,9 @@ function LeadDialog({ options, onClose }) {
         reference: result.reference,
         message: result.duplicate
           ? "We already have this request. Our advisor will be in touch soon."
-          : "Thank you! Our advisor will contact you shortly.",
+          : values.call_consent
+            ? "Thank you! If you opted in, our AI assistant may call during business hours."
+            : "Thank you! Our advisor will contact you shortly.",
       });
     } catch (error) {
       setStatus({ state: "error", reference: "", message: error.message });
@@ -334,6 +337,19 @@ function LeadDialog({ options, onClose }) {
                   <textarea id="lead-message" rows={3} maxLength={2000} className={`${input} h-auto py-3`} placeholder="Anything we should know before we call?" value={values.message} onChange={set("message")} />
                 </label>
               </div>
+
+              <label className="flex items-start gap-3 rounded-xl border border-charcoal/10 bg-[#fbfaf7] p-3 text-xs leading-5 text-charcoal/80">
+                <input
+                  type="checkbox"
+                  checked={values.call_consent}
+                  onChange={(event) => setValues((current) => ({ ...current, call_consent: event.target.checked }))}
+                  className="mt-1 size-4 shrink-0 accent-[#142536]"
+                />
+                <span>
+                  I agree to receive up to one automated AI follow-up call about this request, Monday–Saturday,
+                  10 AM–7 PM IST. The assistant will identify itself as AI. This is optional.
+                </span>
+              </label>
 
               {status.state === "error" && (
                 <p className="rounded-xl bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-800" role="alert">

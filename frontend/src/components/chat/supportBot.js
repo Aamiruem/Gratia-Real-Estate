@@ -93,10 +93,12 @@ export const QUICK_REPLIES = [
 ];
 
 export const GREETING = {
-  text: `Hi! I'm the Gratia Estates assistant. Ask me about our ${projects.length} Gurgaon projects, prices, sectors, developers, site visits or buying checks.`,
+  text: `Hi! I'm Gratia Estates' AI assistant. Ask me about our ${projects.length} Gurgaon projects, prices, sectors, developers, site visits or buying checks.`,
 };
 
-export function answer(rawQuestion) {
+const HINDI_SCRIPT = /[\u0900-\u097f]/;
+
+function answerEnglish(rawQuestion) {
   const question = rawQuestion.trim();
   const text = ` ${question.toLowerCase().replace(/[?!.,]/g, " ")} `.replace(/\s+/g, " ");
 
@@ -129,6 +131,104 @@ export function answer(rawQuestion) {
         { label: "Get latest price", href: whatsappLink(`Hello Gratia Estates, please share the latest price and availability for ${p.name}.`) },
       ],
     };
+  }
+
+  function hindiToSearchText(question) {
+    const hindiDigits = "०१२३४५६७८९";
+    return question
+      .replace(/[०-९]/g, (digit) => String(hindiDigits.indexOf(digit)))
+      .replace(/नमस्ते|नमस्कार/g, " hello ")
+      .replace(/धन्यवाद|शुक्रिया/g, " thanks ")
+      .replace(/कॉल\s*बैक|वापस\s*कॉल/g, " callback ")
+      .replace(/साइट\s*विजिट|साइट\s*देखने|जगह\s*देखने/g, " site visit ")
+      .replace(/कीमत|दाम|मूल्य|कितने\s*की|कितना\s*है|रेट/g, " price ")
+      .replace(/संपर्क|फ़ोन|फोन|मोबाइल|नंबर|ईमेल|पता/g, " contact ")
+      .replace(/रेडी\s*टू\s*मूव|तैयार|कब्ज़ा/g, " ready to move ")
+      .replace(/प्रोजेक्ट|परियोजना|प्रॉपर्टी|संपत्ति|घर|फ्लैट|अपार्टमेंट|विकल्प/g, " projects ")
+      .replace(/दिखाइए|दिखाएँ|दिखाओ|सूची/g, " show projects ")
+      .replace(/बजट/g, " budget ")
+      .replace(/करोड़|करोड़/g, " crore ")
+      .replace(/लाख/g, " lakh ")
+      .replace(/से\s*कम|तक/g, " under ")
+      .replace(/सेक्टर/g, " sector ")
+      .replace(/कहाँ|कहां|इलाका/g, " location ")
+      .replace(/लोन|कर्ज़|कर्ज|ईएमआई|ब्याज/g, " loan ");
+  }
+
+  function answerHindi(rawQuestion) {
+    const question = rawQuestion.trim();
+    if (!question) {
+      return {
+        text: `नमस्ते! मैं ग्रेशिया एस्टेट्स का AI सहायक हूँ। आप ${projects.length} गुरुग्राम प्रोजेक्ट, कीमत, लोकेशन या साइट विज़िट के बारे में पूछ सकते हैं।`,
+        quick: QUICK_REPLIES,
+      };
+    }
+
+    const translated = hindiToSearchText(question);
+    const normalized = translated.toLowerCase();
+    const base = answerEnglish(translated);
+    const namedProject = projects.find((project) => {
+      const name = project.name.toLowerCase();
+      return question.toLowerCase().includes(name) || question.toLowerCase().includes(project.slug);
+    });
+
+    if (namedProject) {
+      return {
+        ...base,
+        text: `${namedProject.name}, ${namedProject.developer} का प्रोजेक्ट है। यह ${namedProject.location} में है। स्थिति: ${namedProject.status}। शुरुआती कीमत: ${namedProject.price}।`,
+      };
+    }
+    if (/(^|\s)(hello|hi|namaste)(\s|$)/.test(normalized)) {
+      return { ...base, text: "नमस्ते! गुरुग्राम में प्रॉपर्टी खोजने के लिए मैं आपकी कैसे मदद कर सकता हूँ?" };
+    }
+    if (/(^|\s)(contact|phone|email|address)(\s|$)/.test(normalized)) {
+      return {
+        ...base,
+        text: `आप ग्रेशिया एस्टेट्स से ${CONTACT.phone} पर कॉल या WhatsApp कर सकते हैं, या ${CONTACT.email} पर ईमेल भेज सकते हैं। कार्यालय: ${CONTACT.office}।`,
+      };
+    }
+    if (/(site visit|callback|appointment|book)/.test(normalized)) {
+      return {
+        ...base,
+        text: "हम आपके लिए साइट विज़िट की व्यवस्था कर सकते हैं। नीचे दिए गए लिंक से ऑनलाइन समय चुनें या WhatsApp पर अपनी पसंद बताएं।",
+      };
+    }
+    if (/(rera|approval|document|legal|verify|due diligence)/.test(normalized)) {
+      return {
+        ...base,
+        text: "बुकिंग से पहले HRERA पंजीकरण, अनुमतियाँ, भूमि का टाइटल, बिल्डर का रिकॉर्ड, कार्पेट एरिया, सभी शुल्क और पजेशन की तारीख जाँचें। भुगतान से पहले बिल्डर-बायर एग्रीमेंट पढ़ें; कानूनी सलाह के लिए विशेषज्ञ से बात करें।",
+      };
+    }
+
+    const matchedProjects = (base.links || [])
+      .map((link) => projects.find((project) => link.to === `/projects/${project.slug}`))
+      .filter(Boolean);
+    if (matchedProjects.length) {
+      const details = matchedProjects
+        .slice(0, 5)
+        .map((project) => `${project.name}: ${project.location}, ${project.status}, ${project.price}`)
+        .join("; ");
+      return {
+        ...base,
+        text: `यहाँ आपकी खोज से मेल खाते सूचीबद्ध प्रोजेक्ट हैं: ${details}। सटीक उपलब्धता और शर्तें सलाहकार से पुष्टि करें।`,
+      };
+    }
+    if (/(loan|emi)/.test(normalized)) {
+      return {
+        ...base,
+        text: "होम लोन की EMI बैंक की ब्याज दर और आपकी प्रोफ़ाइल पर निर्भर करती है। अनुमान देखने के लिए नीचे दिया गया EMI कैलकुलेटर खोलें; अंतिम शर्तें बैंक से पुष्टि करें।",
+      };
+    }
+    return {
+      ...base,
+      text: "मुझे इस सवाल का सही उत्तर उपलब्ध जानकारी में नहीं मिला, इसलिए मैं अनुमान नहीं लगाऊँगा। नीचे दिए गए WhatsApp या कॉल लिंक से हमारे सलाहकार से बात करें।",
+    };
+  }
+
+  export function answer(rawQuestion, language = "en-IN") {
+    return language === "hi-IN" || HINDI_SCRIPT.test(rawQuestion)
+      ? answerHindi(rawQuestion)
+      : answerEnglish(rawQuestion);
   }
   if (named.length > 1) return listReply("I found these matching projects:", named);
 

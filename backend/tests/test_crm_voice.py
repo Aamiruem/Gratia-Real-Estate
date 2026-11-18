@@ -28,6 +28,7 @@ def test_voice_status_reports_safe_test_mode_and_missing_provider_keys(client, o
         "assistant_enabled": False,
         "assistant_test_mode": True,
         "phone_enabled": False,
+        "automatic_calls_enabled": False,
         "phone_missing_settings": ["RETELL_API_KEY", "RETELL_AGENT_ID", "RETELL_PHONE_NUMBER"],
         "price_prediction_enabled": True,
     }

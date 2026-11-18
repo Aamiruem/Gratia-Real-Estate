@@ -19,14 +19,16 @@ const privacySections = [
   {
     title: "Communication and consent",
     body: [
-      "When you submit an enquiry, call us, email us or contact us through WhatsApp, you consent to being contacted by Gratia Estates regarding your property requirement.",
-      "You may ask us to stop promotional or follow-up communication at any time by contacting us through the email address or phone number listed below.",
+      "When you submit an enquiry, call us, email us or contact us through WhatsApp, we may contact you about that property requirement. Submitting an enquiry alone does not enroll you in automated AI calls.",
+      "We schedule an automated AI follow-up call only when you select the separate, optional consent checkbox on a form. Calls are limited to Monday–Saturday, 10 AM–7 PM India time. You may withdraw consent or ask us to stop follow-up communication at any time using the contact details below.",
+      "If you use voice input in the website assistant, your browser's speech service processes the audio and the resulting text is sent to our website to answer your question. You can type instead.",
     ],
   },
   {
     title: "Sharing of information",
     body: [
       "We do not sell your personal information. We may share relevant enquiry details with trusted team members, channel partners, developers or service providers only when needed to respond to your request, arrange a visit or provide project information.",
+      "If you opt in to an AI phone call, your name, phone number and relevant published property details are sent to our voice-service provider, Retell AI, to place and handle that call. Call audio and call metadata may be processed under the provider's settings and privacy terms.",
       "We may disclose information if required by law, regulation, legal process or a lawful request from a government authority.",
     ],
   },
@@ -41,6 +43,7 @@ const privacySections = [
     title: "Data security and retention",
     body: [
       "We take reasonable steps to protect your information from unauthorised access, misuse, loss or disclosure. However, no website, messaging platform or internet transmission can be guaranteed to be completely secure.",
+      "Our CRM stores call status and a short call summary, not call transcripts or recordings. The voice-service provider may retain or process call audio according to its settings and policies.",
       "We retain enquiry information only for as long as reasonably necessary for advisory, follow-up, record-keeping, legal or business purposes.",
     ],
   },

@@ -105,6 +105,7 @@ export default function BookVisit() {
     name: "",
     phone: "",
     contactBy: "WhatsApp",
+    callConsent: false,
     notes: "",
     customTime: "",
     question: "",
@@ -214,6 +215,7 @@ export default function BookVisit() {
       visit_time: timeText,
       visitors: booking.group,
       contact_method: booking.contactBy,
+      call_consent: booking.callConsent,
       message: [booking.notes, booking.question && `Question: ${booking.question}`].filter(Boolean).join(" | "),
     }).then((result) => result?.reference && setReference(result.reference));
   };
@@ -482,6 +484,18 @@ export default function BookVisit() {
                       <TextField label="Your name" value={booking.name} onChange={(v) => set("name", v)} error={errors.name} autoComplete="name" placeholder="Full name" />
                       <TextField label="Phone number" value={booking.phone} onChange={(v) => set("phone", v)} error={errors.phone} type="tel" autoComplete="tel" placeholder="10-digit mobile number" />
                     </div>
+                    <label className="mt-5 flex items-start gap-3 rounded-xl border border-[#e7e2d8] bg-[#fbfaf7] p-3 text-xs leading-5 text-[#536272]">
+                      <input
+                        type="checkbox"
+                        checked={booking.callConsent}
+                        onChange={(event) => set("callConsent", event.target.checked)}
+                        className="mt-1 size-4 shrink-0 accent-emerald-700"
+                      />
+                      <span>
+                        Optional: I agree to receive up to one automated AI follow-up call about this visit,
+                        Monday–Saturday, 10 AM–7 PM IST. The assistant will identify itself as AI.
+                      </span>
+                    </label>
                     <p className="mt-5 text-xs font-bold uppercase tracking-[.12em] text-[#536272]">Best way to confirm</p>
                     <div className="mt-2 flex flex-wrap gap-2">
                       {["WhatsApp", "Phone call"].map((option) => (

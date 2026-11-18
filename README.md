@@ -80,13 +80,34 @@ SMTP_FROM=Gratia Estates <yourname@gmail.com>
 Always set `OWNER_PHONE_NUMBER` (the only number allowed to sign in).
 Users can type it as `98765 43210`, `09876543210` or `+91 98765 43210`.
 
-**CRM voice assistant and calls:** Set `OPENAI_API_KEY` to enable the staff-only
-voice assistant. It can read minimized lead/property summaries and propose a
-follow-up; staff must confirm before it is saved. To enable phone calls, set
-`RETELL_API_KEY`, `RETELL_AGENT_ID` and `RETELL_PHONE_NUMBER`, bind inbound and
-outbound agents to the number in Retell, and register
-`https://<site>/api/webhooks/retell` as the signed webhook URL. Outbound calls
-are admin-initiated only and require the lead's CRM call-consent flag. Store
+**AI voice assistant and calls:** The public chat supports English/Hindi voice
+input and spoken answers in browsers that provide Speech Recognition and
+Speech Synthesis. Its verified, bilingual fallback works without an OpenAI key;
+set `OPENAI_API_KEY` for natural-language answers using published listings. The
+staff-only CRM assistant can read minimized lead/property summaries and propose
+a follow-up; staff must confirm before it is saved.
+
+To enable inbound and automated outbound Retell calls, set
+`RETELL_API_KEY`, `RETELL_AGENT_ID`, `RETELL_PHONE_NUMBER` and
+`OWNER_PHONE_NUMBER`; bind the Retell number to the inbound/outbound agent and
+register `https://<site>/api/webhooks/retell` as the signed webhook URL. The
+Render blueprint adds a billable Cron service that checks the durable call queue
+every five minutes. It calls only after explicit, recorded consent, Monday–
+Saturday between 10 AM and 7 PM IST, and honors the lead's requested morning,
+afternoon or evening window. Jobs use Retell idempotency, retry transient
+failures, recheck consent before dialing, and appear in CRM call history.
+Configure the Retell credentials for both the API and Cron services in Render.
+
+Use this behavior in the Retell agent prompt (the API supplies
+`customer_name`, `property_name`, `lead_reference`, `published_properties`,
+`business_hours`, `human_handoff_number` and `ai_disclosure` for outbound
+calls): disclose that you are an AI, speak Hindi or English to match the
+customer, answer only from the supplied published property facts, and never
+guess prices or availability. During business hours, offer a warm transfer to
+`human_handoff_number` when asked for a person; otherwise collect a callback
+request. For inbound calls, keep the Retell knowledge base synchronized with
+published listings and enable the same language, disclosure and handoff rules.
+Never configure the agent to call a lead without recorded consent. Store
 provider credentials in the hosting dashboard, never in source control.
 
 Security built in: codes are 6 digits, valid 10 minutes, stored only as a
@@ -168,8 +189,8 @@ device key). Optional browser push (VAPID keys) and owner phone alerts (ntfy).
 **Analytics**: consent banner; GA4 (`VITE_GA_MEASUREMENT_ID`) and first-party
 events load only after "Accept". No personal data is sent.
 
-**AI chat assistant**: set `OPENAI_API_KEY` on the backend; otherwise the chat
-uses its built-in answers.
+**AI chat assistant**: set `OPENAI_API_KEY` on the backend for natural-language
+answers; otherwise the chat uses its built-in English/Hindi property answers.
 
 Guides:
 - [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md): Vercel + GoDaddy DNS, Render/AWS database, shared hosting, VPS

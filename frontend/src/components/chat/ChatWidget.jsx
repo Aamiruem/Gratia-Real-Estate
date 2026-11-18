@@ -1,4 +1,4 @@
-import { ArrowUpRight, MessageSquareText, SendHorizontal, X } from "lucide-react";
+import { ArrowUpRight, MessageSquareText, Mic, MicOff, SendHorizontal, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { answer, GREETING, QUICK_REPLIES } from "./supportBot";
@@ -17,11 +17,15 @@ export default function ChatWidget() {
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
   const [typing, setTyping] = useState(false);
+  const [voiceLanguage, setVoiceLanguage] = useState("en-IN");
+  const [listening, setListening] = useState(false);
+  const [voiceNotice, setVoiceNotice] = useState("");
   const [messages, setMessages] = useState([
     { from: "bot", ...GREETING, quick: QUICK_REPLIES },
   ]);
   const listRef = useRef(null);
   const inputRef = useRef(null);
+  const recognitionRef = useRef(null);
 
   useEffect(() => {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
@@ -35,7 +39,33 @@ export default function ChatWidget() {
     return () => window.removeEventListener("keydown", onKey);
   }, [open]);
 
-  const send = async (text) => {
+  useEffect(() => {
+    if (open) return undefined;
+    recognitionRef.current?.stop();
+    window.speechSynthesis?.cancel();
+    return undefined;
+  }, [open]);
+
+  useEffect(
+    () => () => {
+      recognitionRef.current?.stop();
+      window.speechSynthesis?.cancel();
+    },
+    [],
+  );
+
+  const speak = (text) => {
+    if (!window.speechSynthesis || !window.SpeechSynthesisUtterance) {
+      setVoiceNotice("Spoken replies are not supported in this browser.");
+      return;
+    }
+    window.speechSynthesis.cancel();
+    const reply = new window.SpeechSynthesisUtterance(text);
+    reply.lang = voiceLanguage;
+    window.speechSynthesis.speak(reply);
+  };
+
+  const send = async (text, { speakReply = false } = {}) => {
     const question = text.trim();
     if (!question || typing) return;
     const history = [...messages, { from: "user", text: question }];
@@ -57,15 +87,67 @@ export default function ChatWidget() {
         const builtIn = answer(question);
         setMessages((current) => [...current, { from: "bot", ...builtIn, text: reply, ai: true }]);
         setTyping(false);
+        if (speakReply) speak(reply);
         return;
       } catch {
         // Fall through to the built-in answers.
       }
     }
     window.setTimeout(() => {
-      setMessages((current) => [...current, { from: "bot", ...answer(question) }]);
+      const fallback = answer(question, voiceLanguage);
+      setMessages((current) => [...current, { from: "bot", ...fallback }]);
       setTyping(false);
+      if (speakReply) speak(fallback.text);
     }, REPLY_DELAY_MS);
+  };
+
+  const startListening = () => {
+    const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!Recognition) {
+      setVoiceNotice("Voice input is not supported in this browser. You can type your question instead.");
+      return;
+    }
+    setVoiceNotice("");
+    const recognition = new Recognition();
+    recognition.lang = voiceLanguage;
+    recognition.interimResults = true;
+    recognition.continuous = false;
+    let submitted = false;
+    recognition.onresult = (event) => {
+      const transcript = Array.from(event.results)
+        .map((result) => result[0]?.transcript || "")
+        .join(" ")
+        .trim();
+      setInput(transcript);
+      const finalTranscript = Array.from(event.results)
+        .filter((result) => result.isFinal)
+        .map((result) => result[0]?.transcript || "")
+        .join(" ")
+        .trim();
+      if (finalTranscript && !submitted) {
+        submitted = true;
+        setVoiceNotice("");
+        send(finalTranscript, { speakReply: true });
+      }
+    };
+    recognition.onerror = (event) => {
+      if (event.error !== "aborted") {
+        setVoiceNotice("Voice input could not start. Check your microphone permission or type your question.");
+      }
+    };
+    recognition.onend = () => {
+      setListening(false);
+      recognitionRef.current = null;
+    };
+    recognitionRef.current = recognition;
+    setListening(true);
+    try {
+      recognition.start();
+    } catch {
+      setListening(false);
+      recognitionRef.current = null;
+      setVoiceNotice("Voice input could not start. Check your microphone permission or type your question.");
+    }
   };
 
   return (
@@ -153,6 +235,25 @@ export default function ChatWidget() {
             }}
             className="flex items-center gap-2 border-t border-[#e7e2d8] bg-white p-3"
           >
+            <label htmlFor="support-chat-language" className="sr-only">Voice language</label>
+            <select
+              id="support-chat-language"
+              value={voiceLanguage}
+              onChange={(event) => setVoiceLanguage(event.target.value)}
+              className="h-10 max-w-20 rounded-full border border-[#d9dce0] bg-white px-2 text-xs font-semibold text-[#142536] outline-none focus:border-[#c9a45c]"
+            >
+              <option value="en-IN">EN</option>
+              <option value="hi-IN">हिन्दी</option>
+            </select>
+            <button
+              type="button"
+              onClick={() => (listening ? recognitionRef.current?.stop() : startListening())}
+              aria-label={listening ? "Stop voice input" : "Ask by voice"}
+              title={listening ? "Stop listening" : "Ask by voice"}
+              className={`grid size-10 shrink-0 place-items-center rounded-full ${listening ? "bg-rose-100 text-rose-800" : "bg-[#f3ead8] text-[#142536]"}`}
+            >
+              {listening ? <MicOff size={17} aria-hidden="true" /> : <Mic size={17} aria-hidden="true" />}
+            </button>
             <label htmlFor="support-chat-input" className="sr-only">
               Type your question
             </label>
@@ -175,6 +276,9 @@ export default function ChatWidget() {
               <SendHorizontal size={18} aria-hidden="true" />
             </button>
           </form>
+          <p className="border-t border-[#f0ede7] px-4 py-2 text-[10px] leading-4 text-[#68717a]" aria-live="polite">
+            {voiceNotice || "Voice input uses your browser’s speech service; Gratia Estates receives the resulting text."}
+          </p>
         </section>
       )}
     </>

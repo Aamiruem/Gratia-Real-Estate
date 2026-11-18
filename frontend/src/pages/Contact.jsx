@@ -417,6 +417,7 @@ function EnquiryForm() {
     requirement: "",
     contactTime: "",
     message: "",
+    callConsent: false,
   });
   const [errors, setErrors] = useState({});
 
@@ -451,6 +452,7 @@ function EnquiryForm() {
       property_type: form.propertyType,
       requirement: form.requirement,
       contact_time: form.contactTime,
+      call_consent: form.callConsent,
       message: [form.timeline && `Buying timeline: ${form.timeline}`, form.message].filter(Boolean).join(" | "),
     });
     openWhatsApp(
@@ -555,6 +557,18 @@ function EnquiryForm() {
             placeholder="Share your priorities, preferred possession timeline, amenities or questions..."
             className="w-full resize-y rounded-2xl border border-[#d9dce0] bg-white px-4 py-3.5 text-sm text-[#142536] outline-none transition placeholder:text-[#87909a] focus:border-[#c6a15b] focus:ring-4 focus:ring-[#c6a15b]/10"
           />
+        </label>
+        <label className="flex items-start gap-3 rounded-xl border border-[#e7e2d8] bg-white p-3 text-xs leading-5 text-[#536272] sm:col-span-2">
+          <input
+            type="checkbox"
+            checked={form.callConsent}
+            onChange={(event) => updateField("callConsent", event.target.checked)}
+            className="mt-1 size-4 shrink-0 accent-[#142536]"
+          />
+          <span>
+            Optional: I agree to receive up to one automated AI follow-up call about this enquiry,
+            Monday–Saturday, 10 AM–7 PM IST. The assistant will identify itself as AI.
+          </span>
         </label>
       </div>
 

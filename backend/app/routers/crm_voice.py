@@ -18,10 +18,12 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from .. import audit, config, ratelimit
+from ..automated_calls import cancel_queued_calls, has_processing_call
 from ..database import get_db
-from ..models import FollowUp, Lead, Property, User, VoiceCall
+from ..models import AutomatedCallJob, FollowUp, Lead, Property, User, VoiceCall
 from ..permissions import require_any_staff, staff_role
 from ..predictor import service as prediction_service
+from ..retell import RetellCallError, create_retell_phone_call, retell_configured
 from .predictions import PropertyPredictionRequest
 
 router = APIRouter(prefix="/admin/crm/voice", tags=["CRM voice"])
@@ -29,7 +31,6 @@ webhook_router = APIRouter(prefix="/webhooks/retell", tags=["Retell webhooks"])
 logger = logging.getLogger("gratia.crm_voice")
 
 OPENAI_CHAT_URL = "https://api.openai.com/v1/chat/completions"
-RETELL_CALL_URL = "https://api.retellai.com/v2/create-phone-call"
 ACTIVE_CALL_STATUSES = ("registered", "ongoing", "in_progress")
 
 
@@ -55,13 +56,6 @@ class FollowUpConfirmation(FollowUpProposal):
 class VoiceCallRequest(BaseModel):
     lead_reference: str = Field(min_length=5, max_length=20)
     confirmed: bool
-
-
-def _retell_configured() -> bool:
-    return all(
-        config.env(name)
-        for name in ("RETELL_API_KEY", "RETELL_AGENT_ID", "RETELL_PHONE_NUMBER")
-    )
 
 
 def _assistant_setting_enabled(db: Session) -> bool:
@@ -112,6 +106,9 @@ def voice_status(
         "assistant_enabled": _assistant_enabled(db),
         "assistant_test_mode": _assistant_test_mode(db),
         "phone_enabled": not missing_phone_settings,
+        "automatic_calls_enabled": (
+            not missing_phone_settings and config.env_bool("RETELL_AUTO_CALLS_ENABLED", False)
+        ),
         "phone_missing_settings": missing_phone_settings,
         "price_prediction_enabled": prediction_ready,
     }
@@ -382,7 +379,7 @@ def create_outbound_call(
 ):
     if not payload.confirmed:
         raise HTTPException(status_code=400, detail="Explicit confirmation is required before calling.")
-    if not _retell_configured():
+    if not retell_configured():
         raise HTTPException(status_code=503, detail="Retell phone calling is not configured.")
     lead = db.scalar(select(Lead).where(Lead.reference == payload.lead_reference.upper()))
     if lead is None:
@@ -401,56 +398,37 @@ def create_outbound_call(
     )
     if recent_call:
         raise HTTPException(status_code=409, detail="A call for this lead is already in progress.")
+    if has_processing_call(db, lead.id):
+        raise HTTPException(status_code=409, detail="An automated call for this lead is already starting.")
 
     idempotency_key = secrets.token_hex(24)
-    call_request = {
-        "from_number": config.env("RETELL_PHONE_NUMBER"),
-        "to_number": lead.phone,
-        "override_agent_id": config.env("RETELL_AGENT_ID"),
-        "idempotency_key": idempotency_key,
-        "honor_internal_dnc": True,
-        "metadata": {"lead_reference": lead.reference},
-        "retell_llm_dynamic_variables": {
-            "customer_name": lead.name,
-            "property_name": lead.property_name or "not specified",
-            "lead_reference": lead.reference,
-        },
-    }
-    outbound = HttpRequest(
-        RETELL_CALL_URL,
-        data=json.dumps(call_request).encode("utf-8"),
-        headers={
-            "Authorization": f"Bearer {config.env('RETELL_API_KEY')}",
-            "Content-Type": "application/json",
-        },
-        method="POST",
-    )
+    cancel_queued_calls(db, lead.id, "A staff member started a call.")
+    db.commit()
     try:
-        with urlopen(outbound, timeout=20) as response:
-            result = json.loads(response.read().decode("utf-8"))
-    except HTTPError as error:
-        logger.error("Retell call creation returned HTTP %s", error.code)
-        raise HTTPException(status_code=502, detail=f"Retell did not accept the call (HTTP {error.code}).") from error
-    except (URLError, KeyError, TypeError, ValueError, TimeoutError):
-        logger.exception("Retell call creation failed")
-        raise HTTPException(status_code=502, detail="Could not connect to Retell to start the call.")
+        result = create_retell_phone_call(db, lead, idempotency_key=idempotency_key, automated=False)
+    except RetellCallError as error:
+        if not retell_configured():
+            raise HTTPException(status_code=503, detail="Retell phone calling is not configured.") from error
+        if error.status_code:
+            raise HTTPException(
+                status_code=502,
+                detail=f"Retell did not accept the call (HTTP {error.status_code}).",
+            ) from error
+        raise HTTPException(status_code=502, detail="Could not connect to Retell to start the call.") from error
 
-    call_id = result.get("call_id")
-    if not isinstance(call_id, str) or not call_id:
-        raise HTTPException(status_code=502, detail="Retell did not return a call ID; the call status is unknown.")
     call = VoiceCall(
-        call_id=call_id,
+        call_id=result["call_id"],
         lead_id=lead.id,
         initiated_by_id=staff.id,
         direction="outbound",
-        status=str(result.get("call_status") or "registered")[:40],
-        from_number=call_request["from_number"],
-        to_number=call_request["to_number"],
+        status=result["call_status"],
+        from_number=result["from_number"],
+        to_number=result["to_number"],
     )
     db.add(call)
-    audit.record(db, staff, "voice_call", "lead", lead.reference, f"Retell AI outbound call started ({call_id})")
+    audit.record(db, staff, "voice_call", "lead", lead.reference, f"Retell AI outbound call started ({result['call_id']})")
     db.commit()
-    return {"call_id": call_id, "status": call.status, "lead_reference": lead.reference}
+    return {"call_id": result["call_id"], "status": call.status, "lead_reference": lead.reference}
 
 
 @router.get("/calls")
@@ -470,10 +448,10 @@ def list_voice_calls(
         query = query.where(
             VoiceCall.lead_id.in_(select(Lead.id).where(Lead.assigned_to_id == staff.id))
         )
-    rows = db.execute(query.order_by(VoiceCall.created_at.desc()).limit(max(1, min(limit, 100)))).all()
-    return {
-        "items": [
-            {
+    capped_limit = max(1, min(limit, 100))
+    rows = db.execute(query.order_by(VoiceCall.created_at.desc()).limit(capped_limit)).all()
+    items = [
+        {
                 "call_id": call.call_id,
                 "lead_reference": reference,
                 "direction": call.direction,
@@ -482,10 +460,37 @@ def list_voice_calls(
                 "started_at": call.started_at,
                 "ended_at": call.ended_at,
                 "created_at": call.created_at,
-            }
-            for call, reference in rows
-        ]
-    }
+        }
+        for call, reference in rows
+    ]
+
+    job_query = (
+        select(AutomatedCallJob, Lead.reference)
+        .join(Lead, AutomatedCallJob.lead_id == Lead.id)
+        .where(AutomatedCallJob.status.in_(("queued", "processing", "failed")))
+    )
+    if lead_reference:
+        job_query = job_query.where(AutomatedCallJob.lead_id == lead.id)
+    if staff_role(staff) == "agent":
+        job_query = job_query.where(Lead.assigned_to_id == staff.id)
+    jobs = db.execute(
+        job_query.order_by(AutomatedCallJob.created_at.desc()).limit(capped_limit)
+    ).all()
+    items.extend(
+        {
+            "call_id": f"automation-{job.id}",
+            "lead_reference": reference,
+            "direction": "automated outbound",
+            "status": job.status,
+            "summary": job.last_error,
+            "started_at": None,
+            "ended_at": None,
+            "created_at": job.created_at,
+        }
+        for job, reference in jobs
+    )
+    items.sort(key=lambda item: item["created_at"], reverse=True)
+    return {"items": items[:capped_limit]}
 
 
 def _verify_retell_signature(raw_body: bytes, signature: str, api_key: str, now_ms: int | None = None) -> bool:

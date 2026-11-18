@@ -21,6 +21,7 @@ from sqlalchemy import delete, func, or_, select
 from sqlalchemy.orm import Session
 
 from .. import audit, notifications, ratelimit
+from ..automated_calls import cancel_queued_calls, enqueue_automated_call
 from ..database import get_db
 from ..models import AuditLog, FollowUp, Lead, Notification, User
 from ..permissions import require_any_staff, require_manager, staff_role
@@ -126,6 +127,7 @@ class LeadCreate(BaseModel):
     requirement: Optional[Requirement] = None
     contact_time: Optional[str] = Field(default=None, max_length=60)
     source: Optional[str] = Field(default=None, max_length=60)
+    call_consent: bool = False
     # Random key kept in the visitor's browser: their confirmations are saved for that device.
     device_token: Optional[str] = Field(default=None, max_length=80)
     # Honeypot: hidden from people, bots tend to fill it.
@@ -333,9 +335,17 @@ def create_lead(
         .order_by(Lead.created_at.desc())
     ).first()
     if existing:
+        consent_granted = payload.call_consent and not existing.call_consent
+        if consent_granted:
+            existing.call_consent = True
+            existing.call_consent_at = now
+            existing.call_consent_by_id = None
+            enqueue_automated_call(db, existing)
+            audit.record(db, None, "call_consent", "lead", existing.reference, "AI phone-call consent granted on a duplicate website enquiry.")
         # Same enquiry again (maybe from another device): make sure this device
         # also sees the confirmation in its notification bell.
         device = notifications.device_hash(payload.device_token)
+        added_notification = False
         if device and not db.scalar(
             select(Notification.id).where(
                 Notification.audience == "visitor",
@@ -353,6 +363,8 @@ def create_lead(
                 link="/notifications",
                 lead_reference=existing.reference,
             )
+            added_notification = True
+        if consent_granted or added_notification:
             db.commit()
         response.status_code = status.HTTP_200_OK
         return LeadCreated(
@@ -385,10 +397,14 @@ def create_lead(
         requirement=payload.requirement,
         contact_time=clean(payload.contact_time, 60),
         source=payload.source if payload.source in SOURCES else ("direct" if payload.source else None),
+        call_consent=payload.call_consent,
+        call_consent_at=now if payload.call_consent else None,
         device_hash=notifications.device_hash(payload.device_token),
     )
     db.add(lead)
     db.flush()
+    if lead.call_consent:
+        enqueue_automated_call(db, lead)
     audit.record(db, None, "created", "lead", lead.reference, f"Submitted on the website ({lead.source_page or 'unknown page'}).")
 
     title = KIND_TITLES[payload.kind]
@@ -749,6 +765,10 @@ def update_lead(
         lead.call_consent = payload.call_consent
         lead.call_consent_at = datetime.now(timezone.utc) if payload.call_consent else None
         lead.call_consent_by_id = staff.id if payload.call_consent else None
+        if payload.call_consent:
+            enqueue_automated_call(db, lead)
+        else:
+            cancel_queued_calls(db, lead.id, "Consent was withdrawn.")
         changes.append("AI phone-call consent recorded" if payload.call_consent else "AI phone-call consent withdrawn")
     if payload.status is not None:
         if payload.status not in allowed_statuses(lead.kind):
@@ -910,9 +930,14 @@ def create_lead_by_staff(
         owner_notes=clean(payload.owner_notes, 5000) or "",
         assigned_to_id=payload.assigned_to_id,
         follow_up_at=payload.follow_up_at,
+        call_consent=payload.call_consent,
+        call_consent_at=datetime.now(timezone.utc) if payload.call_consent else None,
+        call_consent_by_id=staff.id if payload.call_consent else None,
     )
     db.add(lead)
     db.flush()
+    if lead.call_consent:
+        enqueue_automated_call(db, lead)
     note = f"Entered by {staff.name} in the admin panel."
     if duplicate:
         note += f" Same phone as earlier lead {duplicate}."

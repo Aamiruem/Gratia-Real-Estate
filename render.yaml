@@ -87,10 +87,48 @@ services:
         sync: false
       - key: RETELL_PHONE_NUMBER
         sync: false
+      - key: RETELL_AUTO_CALLS_ENABLED
+        value: "true"
       # Vercel -> Project -> Settings -> Git -> Deploy Hooks: rebuilds the sitemap
       # when properties change in the admin panel.
       - key: VERCEL_DEPLOY_HOOK_URL
         sync: false
+
+  - type: cron
+    name: gratia-ai-call-scheduler
+    runtime: python
+    plan: starter
+    rootDir: backend
+    schedule: "*/5 * * * *"
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -m app.voice_scheduler
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.8"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: gratia-db
+          property: connectionString
+      - key: COOKIE_SECURE
+        value: "true"
+      - key: JWT_SECRET_KEY
+        generateValue: true
+      - key: JWT_REFRESH_SECRET_KEY
+        generateValue: true
+      - key: RETELL_API_KEY
+        sync: false
+      - key: RETELL_AGENT_ID
+        sync: false
+      - key: RETELL_PHONE_NUMBER
+        sync: false
+      - key: OWNER_PHONE_NUMBER
+        sync: false
+      - key: RETELL_AUTO_CALLS_ENABLED
+        value: "true"
+      - key: RETELL_CALL_START_HOUR
+        value: "10"
+      - key: RETELL_CALL_END_HOUR
+        value: "19"
 
 databases:
   - name: gratia-db

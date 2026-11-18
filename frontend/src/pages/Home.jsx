@@ -90,6 +90,7 @@ function HomeContactPopup() {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [requirement, setRequirement] = useState("");
+  const [callConsent, setCallConsent] = useState(false);
   const nameInputRef = useRef(null);
 
   useEffect(() => {
@@ -136,7 +137,12 @@ function HomeContactPopup() {
     const cleanPhone = phone.replace(/\D/g, "");
     if (cleanPhone.length !== 10 || !isValidPhone(cleanPhone)) return;
 
-    saveLeadInBackground("whatsapp", { name, phone: cleanPhone, message: requirement });
+    saveLeadInBackground("whatsapp", {
+      name,
+      phone: cleanPhone,
+      message: requirement,
+      call_consent: callConsent,
+    });
 
     openWhatsApp(
       formatWhatsAppMessage("🏠 *New Website Enquiry*", [
@@ -245,6 +251,19 @@ function HomeContactPopup() {
                 required
                 className="w-full rounded-xl border border-charcoal/30 px-4 py-3 text-sm text-charcoal placeholder:text-charcoal/55 outline-none transition focus:border-gold focus:ring-4 focus:ring-gold/10"
               />
+            </label>
+
+            <label className="flex items-start gap-3 rounded-xl border border-charcoal/10 bg-[#fbfaf7] p-3 text-xs leading-5 text-charcoal/80">
+              <input
+                type="checkbox"
+                checked={callConsent}
+                onChange={(event) => setCallConsent(event.target.checked)}
+                className="mt-1 size-4 shrink-0 accent-[#142536]"
+              />
+              <span>
+                Optional: I agree to receive up to one automated AI follow-up call about this enquiry,
+                Monday–Saturday, 10 AM–7 PM IST. The assistant will identify itself as AI.
+              </span>
             </label>
 
             <button

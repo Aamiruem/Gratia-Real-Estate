@@ -65,6 +65,7 @@ export default function ProjectDetails() {
     phone: "",
     budget: "",
     description: "",
+    callConsent: false,
   });
   // Only this project's own photos; other projects' images must not appear here.
   const galleryImages = project
@@ -149,6 +150,7 @@ export default function ProjectDetails() {
       property_slug: project.slug,
       property_name: `${project.name}, ${project.location}`,
       message: callbackRequest.description,
+      call_consent: callbackRequest.callConsent,
     });
     openWhatsApp(
       formatWhatsAppMessage("📲 *Callback Request*", [
@@ -572,6 +574,20 @@ export default function ProjectDetails() {
                   }
                   className="w-full resize-y rounded-xl border border-white/20 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-white focus:border-gold focus:outline-none"
                 />
+              </label>
+              <label className="flex items-start gap-3 rounded-xl border border-white/15 bg-white/5 p-3 text-xs leading-5 text-white/80">
+                <input
+                  type="checkbox"
+                  checked={callbackRequest.callConsent}
+                  onChange={(event) =>
+                    setCallbackRequest((current) => ({ ...current, callConsent: event.target.checked }))
+                  }
+                  className="mt-1 size-4 shrink-0 accent-gold"
+                />
+                <span>
+                  Optional: I agree to receive up to one automated AI follow-up call about this project,
+                  Monday–Saturday, 10 AM–7 PM IST. The assistant will identify itself as AI.
+                </span>
               </label>
               <button
                 type="submit"
