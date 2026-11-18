@@ -130,7 +130,9 @@ function LeadDialog({ options, onClose }) {
         state: "sent",
         reference: result.reference,
         message: result.duplicate
-          ? "We already have this request. Our advisor will be in touch soon."
+          ? values.call_consent
+            ? "We already have this request. Your AI call preference has been recorded."
+            : "We already have this request. Our advisor will be in touch soon."
           : values.call_consent
             ? "Thank you! If you opted in, our AI assistant may call during business hours."
             : "Thank you! Our advisor will contact you shortly.",

@@ -3,15 +3,16 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 from app import ratelimit
-from app.automated_calls import run_scheduled_calls
-from app.database import SessionLocal
-from app.models import AutomatedCallJob, Lead, VoiceCall
 from app import automated_calls
+from app.automated_calls import run_scheduled_calls
+from app.database import SessionLocal, create_tables
+from app.models import AutomatedCallJob, Lead, VoiceCall
 from app.retell import RetellCallError
 
 
 @pytest.fixture(autouse=True)
-def clear_call_state(client):
+def clear_call_state():
+    create_tables()
     ratelimit.reset()
     with SessionLocal() as db:
         db.query(AutomatedCallJob).delete()
@@ -49,7 +50,7 @@ def test_scheduler_waits_until_ist_business_hours_and_starts_once(client, monkey
     job_id = create_consented_lead(client)
     calls = []
 
-    def fake_start(db, lead, *, idempotency_key, automated):
+    def fake_start(_db, lead, *, idempotency_key, automated):
         calls.append((lead.id, idempotency_key, automated))
         return {
             "call_id": "retell-call-1",
@@ -78,7 +79,7 @@ def test_scheduler_honors_requested_contact_window(client, monkeypatch):
     create_consented_lead(client, contact_time="Afternoon (12 PM – 4 PM)")
     calls = []
 
-    def fake_start(_db, lead, *, idempotency_key, automated):
+    def fake_start(_db, lead, **_kwargs):
         calls.append(lead.id)
         return {
             "call_id": "retell-call-2",
@@ -100,7 +101,7 @@ def test_scheduler_retries_transient_retell_error_with_same_idempotency_key(clie
     create_consented_lead(client)
     keys = []
 
-    def fail_once(_db, _lead, *, idempotency_key, automated):
+    def fail_once(_db, _lead, *, idempotency_key, **_kwargs):
         keys.append(idempotency_key)
         if len(keys) == 1:
             raise RetellCallError("Retell returned HTTP 503.", status_code=503, retryable=True)
@@ -135,7 +136,9 @@ def test_scheduler_cancels_call_when_consent_is_withdrawn(client, monkeypatch):
     configure_scheduler(monkeypatch, fake_start)
     with SessionLocal() as db:
         job = db.get(AutomatedCallJob, job_id)
+        assert job is not None
         lead = db.get(Lead, job.lead_id)
+        assert lead is not None
         lead.call_consent = False
         lead.call_consent_at = None
         db.commit()

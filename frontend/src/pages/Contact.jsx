@@ -471,6 +471,7 @@ function EnquiryForm() {
         ],
       ]),
     );
+    updateField("callConsent", false);
   };
 
   return (

@@ -170,6 +170,7 @@ export default function ProjectDetails() {
       phone: "",
       budget: "",
       description: "",
+      callConsent: false,
     });
   };
 

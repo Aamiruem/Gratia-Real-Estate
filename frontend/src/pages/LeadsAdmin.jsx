@@ -444,7 +444,7 @@ function LeadCard({ lead, team, highlighted, onUpdate }) {
             className="mt-1 size-4 accent-[#142536]"
           />
           <span>
-            Customer has consented to AI phone contact
+            Customer has consented to one automated AI follow-up call
             {lead.call_consent_at && <span className="block text-[11px] text-[#5e6872]">Recorded {new Date(lead.call_consent_at).toLocaleString("en-IN")}</span>}
           </span>
         </label>

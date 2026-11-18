@@ -94,6 +94,10 @@ function HomeContactPopup() {
   const nameInputRef = useRef(null);
 
   useEffect(() => {
+    if (!isOpen) setCallConsent(false);
+  }, [isOpen]);
+
+  useEffect(() => {
     // Show the enquiry prompt once per browser session, not on every visit
     // to the home page. Storage can throw in private mode, so guard it.
     try {

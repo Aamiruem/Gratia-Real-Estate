@@ -1,4 +1,7 @@
 from app import ratelimit
+from app import retell
+from app.database import SessionLocal
+from app.models import Lead, Property
 from app.routers import admin, crm_voice
 
 
@@ -118,3 +121,56 @@ def test_live_call_is_blocked_without_retell_credentials(client, outbox, monkeyp
 
     assert response.status_code == 503
     assert response.json()["detail"] == "Retell phone calling is not configured."
+
+
+def test_outbound_call_receives_published_property_context(client, outbox, monkeypatch):
+    import json
+
+    settings = {
+        "RETELL_API_KEY": "test-retell-key",
+        "RETELL_AGENT_ID": "test-agent",
+        "RETELL_PHONE_NUMBER": "+911111111111",
+        "OWNER_PHONE_NUMBER": "+919876543210",
+    }
+    monkeypatch.setattr(retell.config, "env", lambda name, default="": settings.get(name, default))
+    lead = client.post(
+        "/leads",
+        json={"kind": "callback", "name": "Riya Sharma", "phone": "98765 43210", "call_consent": True},
+    ).json()
+    assert lead["reference"]
+    with SessionLocal() as db:
+        assert db.query(Lead).one().call_consent is True
+        assert db.query(Property).filter(Property.published.is_(True)).count() > 0
+
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def read(self):
+            return json.dumps({"call_id": "retell-context-test", "call_status": "registered"}).encode()
+
+    requests = []
+
+    def fake_urlopen(request, timeout):
+        requests.append((request, timeout))
+        return FakeResponse()
+
+    monkeypatch.setattr(retell, "urlopen", fake_urlopen)
+    sign_in_owner(client, outbox)
+    response = client.post(
+        "/admin/crm/voice/calls",
+        json={"lead_reference": lead["reference"], "confirmed": True},
+    )
+
+    assert response.status_code == 200, response.text
+    payload = json.loads(requests[0][0].data)
+    variables = payload["retell_llm_dynamic_variables"]
+    assert payload["to_number"] == "+919876543210"
+    assert variables["customer_name"] == "Riya Sharma"
+    assert variables["published_properties"]
+    assert variables["business_hours"] == "Monday-Saturday, 10:00-19:00 Asia/Kolkata"
+    assert variables["human_handoff_number"] == "+919876543210"
+    assert variables["ai_disclosure"]

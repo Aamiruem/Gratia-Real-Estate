@@ -97,12 +97,6 @@ def _matches_contact_time(contact_time: str | None, local: datetime) -> bool:
     return True
 
 
-def _within_call_window(now: datetime, contact_time: str | None = None) -> bool:
-    local = _utc(now).astimezone(IST)
-    start, end = _call_hours()
-    return local.weekday() < 6 and start <= local.hour < end and _matches_contact_time(contact_time, local)
-
-
 def _has_recent_call(db: Session, lead_id: int, now: datetime) -> bool:
     return db.scalar(
         select(VoiceCall.call_id)
@@ -169,6 +163,7 @@ def run_scheduled_calls(db: Session, now: datetime | None = None) -> int:
             job.last_error = "Consent is no longer active."
             continue
         if not _matches_contact_time(lead.contact_time, local):
+            job.scheduled_at = current + timedelta(minutes=15)
             continue
         if lead.id in seen_leads:
             continue

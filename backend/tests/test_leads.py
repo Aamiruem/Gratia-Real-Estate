@@ -87,6 +87,19 @@ def test_call_consent_is_optional_and_duplicate_opt_in_queues_once(client):
         assert db.query(AutomatedCallJob).count() == 1
 
 
+def test_withdrawing_call_consent_cancels_pending_job(client, outbox):
+    response = client.post("/leads", json=visit(call_consent=True))
+    reference = response.json()["reference"]
+    sign_in_owner(client, outbox)
+
+    updated = client.patch(f"/leads/{reference}", json={"call_consent": False})
+
+    assert updated.status_code == 200 and updated.json()["call_consent"] is False
+    with SessionLocal() as db:
+        job = db.query(AutomatedCallJob).one()
+        assert job.status == "cancelled"
+
+
 @pytest.mark.parametrize(
     "overrides",
     [

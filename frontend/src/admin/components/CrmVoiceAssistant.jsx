@@ -240,6 +240,16 @@ export default function CrmVoiceAssistant() {
                 Live phone calls are disabled. Add these backend secrets to test a real call: <code>{status.phone_missing_settings.join(", ")}</code>. No phone call is simulated or placed without them.
               </p>
             )}
+            {status?.phone_enabled && !status?.automatic_calls_enabled && (
+              <p className="mx-4 mt-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs leading-5 text-[#4b5966]">
+                Manual calls are available. Automatic consented follow-ups are disabled until the scheduler is enabled in the backend.
+              </p>
+            )}
+            {status?.automatic_calls_enabled && (
+              <p className="mx-4 mt-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs leading-5 text-emerald-950">
+                Consented follow-up calls are checked every five minutes and placed only Monday–Saturday, 10 AM–7 PM IST.
+              </p>
+            )}
 
             <section className="border-b border-[#e7e2d8] px-4 py-3" aria-label="Recent AI calls">
               <div className="mb-2 flex items-center justify-between gap-3">

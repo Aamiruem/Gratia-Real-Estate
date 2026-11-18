@@ -338,7 +338,7 @@ export default function BookVisit() {
                   <Link to="/blog/site-visit-checklist-gurgaon" className="inline-flex items-center gap-2 rounded-full bg-[#142536] px-5 py-3 text-sm font-semibold text-white hover:bg-emerald-700">
                     Read the site visit checklist <ArrowRight size={15} aria-hidden="true" />
                   </Link>
-                  <button type="button" onClick={() => { setSent(false); setStep(1); }} className="rounded-full border border-[#d9dce0] px-5 py-3 text-sm font-semibold text-[#142536]">
+                  <button type="button" onClick={() => { setSent(false); setStep(1); set("callConsent", false); }} className="rounded-full border border-[#d9dce0] px-5 py-3 text-sm font-semibold text-[#142536]">
                     Book another visit
                   </button>
                 </div>
