@@ -66,19 +66,23 @@ export function PropertyCategories() {
   const categories = [
     {
       title: "Residential properties",
-      text: "Apartments, luxury residences and premium homes across Gurgaon's most sought-after sectors.",
+      text: "Compare apartments, luxury homes, villas and plots across Gurgaon's established and emerging sectors.",
       image: residential[1]?.image || projects[0]?.image,
+      imageAlt: "Modern residential property in Gurgaon",
       badge: `${residential.length} projects listed`,
+      features: ["Apartments & luxury homes", "Villas, floors & plots", "New launch to ready-to-move"],
       Icon: HomeIcon,
-      action: { label: "Browse residential", to: "/projects?type=residential#results" },
+      action: { label: "Browse homes", to: "/residential" },
     },
     {
       title: "Commercial properties",
-      text: "Office spaces, retail and investment-grade commercial assets. Current options are shared on request.",
+      text: "Explore office spaces, high-street retail and SCO opportunities, with shortlists tailored to your business or investment goals.",
       image: "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1200&q=80",
-      badge: "Available on request",
+      imageAlt: "Commercial office tower in a business district",
+      badge: "Curated to your requirement",
+      features: ["Office spaces", "Retail & SCO units", "Lease and investment guidance"],
       Icon: Briefcase,
-      action: { label: "Ask for commercial options", onClick: () => openLeadDialog({ kind: "consultation", service: "Commercial property" }) },
+      action: { label: "Explore commercial", to: "/commercial" },
     },
   ];
 
@@ -87,11 +91,11 @@ export function PropertyCategories() {
       <div className="container-luxury">
         <Heading id="categories-title" eyebrow="Property categories" title="Residential & commercial" text="Whether you're buying a home or an investment, start with the category that fits you." />
         <div className="mt-10 grid gap-6 md:grid-cols-2">
-          {categories.map(({ title, text, image, badge, Icon, action }) => (
-            <article key={title} className="group relative isolate flex min-h-[340px] overflow-hidden rounded-3xl bg-[#142536] text-white shadow-luxury">
+          {categories.map(({ title, text, image, imageAlt, badge, features, Icon, action }) => (
+            <article key={title} className="group relative isolate flex min-h-[380px] overflow-hidden rounded-3xl bg-[#142536] text-white shadow-luxury">
               <img
                 src={image}
-                alt=""
+                alt={imageAlt}
                 loading="lazy"
                 decoding="async"
                 className="absolute inset-0 -z-10 h-full w-full object-cover opacity-80 transition duration-700 group-hover:scale-105"
@@ -103,15 +107,16 @@ export function PropertyCategories() {
                 </span>
                 <h3 className="mt-4 font-display text-2xl font-bold !text-white sm:text-3xl">{title}</h3>
                 <p className="mt-2 max-w-md text-sm leading-6 text-white/85">{text}</p>
-                {action.to ? (
-                  <Link to={action.to} className="mt-5 inline-flex items-center gap-2 rounded-full bg-[#c9a45c] px-5 py-3 text-xs font-bold uppercase tracking-[.1em] text-[#142536] transition hover:bg-white">
-                    {action.label} <ArrowRight size={15} aria-hidden="true" />
-                  </Link>
-                ) : (
-                  <button type="button" onClick={action.onClick} className="mt-5 inline-flex items-center gap-2 rounded-full bg-[#c9a45c] px-5 py-3 text-xs font-bold uppercase tracking-[.1em] text-[#142536] transition hover:bg-white">
-                    {action.label} <ArrowRight size={15} aria-hidden="true" />
-                  </button>
-                )}
+                <ul className="mt-4 flex flex-wrap gap-2" aria-label={`${title} features`}>
+                  {features.map((feature) => (
+                    <li key={feature} className="rounded-full border border-white/25 bg-black/20 px-3 py-1.5 text-xs font-semibold text-white/95 backdrop-blur">
+                      {feature}
+                    </li>
+                  ))}
+                </ul>
+                <Link to={action.to} className="mt-5 inline-flex items-center gap-2 rounded-full bg-[#c9a45c] px-5 py-3 text-xs font-bold uppercase tracking-[.1em] text-[#142536] transition hover:bg-white">
+                  {action.label} <ArrowRight size={15} aria-hidden="true" />
+                </Link>
               </div>
             </article>
           ))}
