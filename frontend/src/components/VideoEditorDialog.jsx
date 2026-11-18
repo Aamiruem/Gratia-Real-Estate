@@ -178,7 +178,7 @@ export default function VideoEditorDialog({ initial, focus = "title", onSave, on
               <button type="button" onClick={() => fileRef.current?.click()} disabled={busy} className="inline-flex items-center gap-2 rounded-xl border border-dashed border-[#c9a45c] bg-[#fbf8f0] px-4 py-3 text-sm font-semibold text-[#142536] hover:bg-[#f5eedc] disabled:opacity-60">
                 <Upload size={16} aria-hidden="true" /> Choose video from this device
               </button>
-              <p className="mt-1.5 text-xs leading-5 text-[#68717a]">Select a video from your computer, Android, or iPhone · up to 5 GB · uploads directly to video storage</p>
+              <p className="mt-1.5 text-xs leading-5 text-[#68717a]">Select MP4, MOV, WebM, MKV, AVI, or another video from your computer, Android, or iPhone · up to 5 GB · uploads directly to video storage</p>
               {selectedFile && (
                 <div className="mt-3 rounded-xl border border-[#e7e2d8] bg-[#fbf8f0] p-3 text-sm">
                   <div className="flex items-start justify-between gap-3">

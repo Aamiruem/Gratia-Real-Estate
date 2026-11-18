@@ -94,6 +94,20 @@ const VIDEO_CONTENT_TYPES = {
   mpegts: "video/mp2t", mpg: "video/mpeg", mts: "video/mp2t", ogv: "video/ogg", ts: "video/mp2t", webm: "video/webm",
 };
 
+function createUploadId() {
+  const browserCrypto = globalThis.crypto;
+  if (typeof browserCrypto?.randomUUID === "function") {
+    return browserCrypto.randomUUID();
+  }
+  if (typeof browserCrypto?.getRandomValues === "function") {
+    return Array.from(
+      browserCrypto.getRandomValues(new Uint8Array(16)),
+      (byte) => byte.toString(16).padStart(2, "0"),
+    ).join("");
+  }
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+}
+
 export async function uploadVideoFile(file, onProgress) {
   const extension = String(file.name.split(".").pop() || "").toLowerCase();
   if (!file.type.startsWith("video/") && !VIDEO_EXTENSIONS.has(extension)) {
@@ -110,7 +124,7 @@ export async function uploadVideoFile(file, onProgress) {
     .replace(/^-|-$/g, "")
     .slice(-120) || `video.${extension || "bin"}`;
 
-  return upload(`project-videos/${crypto.randomUUID()}-${safeName}`, file, {
+  return upload(`project-videos/${createUploadId()}-${safeName}`, file, {
     access: "public",
     contentType: VIDEO_CONTENT_TYPES[extension] || file.type || "application/octet-stream",
     handleUploadUrl: "/api/video-blob-upload",
