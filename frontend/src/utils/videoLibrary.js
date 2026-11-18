@@ -1,5 +1,5 @@
 import { apiRequest } from "../services/apiClient";
-import { upload } from "@vercel/blob/client";
+import { put } from "@vercel/blob/client";
 
 export const MAX_VIDEO_UPLOAD_BYTES = 5 * 1024 * 1024 * 1024;
 
@@ -108,6 +108,36 @@ function createUploadId() {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
 }
 
+async function getVideoUploadToken(pathname, multipart) {
+  const response = await fetch("/api/video-blob-upload", {
+    method: "POST",
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Requested-With": "fetch",
+    },
+    body: JSON.stringify({
+      type: "blob.generate-client-token",
+      payload: { pathname, clientPayload: null, multipart },
+    }),
+  });
+  let data;
+  try {
+    data = await response.json();
+  } catch {
+    data = null;
+  }
+  if (!response.ok) {
+    throw new Error(
+      data?.detail || data?.error || `Video upload authorization failed (${response.status}).`,
+    );
+  }
+  if (typeof data?.clientToken !== "string" || !data.clientToken) {
+    throw new Error("Video storage did not provide an upload token.");
+  }
+  return data.clientToken;
+}
+
 export async function uploadVideoFile(file, onProgress) {
   const extension = String(file.name.split(".").pop() || "").toLowerCase();
   if (!file.type.startsWith("video/") && !VIDEO_EXTENSIONS.has(extension)) {
@@ -124,12 +154,15 @@ export async function uploadVideoFile(file, onProgress) {
     .replace(/^-|-$/g, "")
     .slice(-120) || `video.${extension || "bin"}`;
 
-  return upload(`project-videos/${createUploadId()}-${safeName}`, file, {
+  const pathname = `project-videos/${createUploadId()}-${safeName}`;
+  const multipart = file.size > 100 * 1024 * 1024;
+  const token = await getVideoUploadToken(pathname, multipart);
+
+  return put(pathname, file, {
     access: "public",
+    token,
     contentType: VIDEO_CONTENT_TYPES[extension] || file.type || "application/octet-stream",
-    handleUploadUrl: "/api/video-blob-upload",
-    headers: { "X-Requested-With": "fetch" },
-    multipart: file.size > 100 * 1024 * 1024,
+    multipart,
     onUploadProgress: onProgress,
   });
 }
