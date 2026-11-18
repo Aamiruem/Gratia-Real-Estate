@@ -6,9 +6,6 @@ import json
 import threading
 from pathlib import Path
 
-import joblib
-import pandas as pd
-
 
 ROOT = Path(__file__).resolve().parent
 MODEL_PATH = ROOT / "model" / "price_model.joblib"
@@ -20,6 +17,8 @@ _cached_mtime_ns = None
 
 def _model_bundle():
     global _cached_model, _cached_mtime_ns
+    import joblib
+
     try:
         current_mtime = MODEL_PATH.stat().st_mtime_ns
     except OSError as error:
@@ -66,6 +65,8 @@ def _public_metrics(metadata: dict) -> dict:
 
 
 def predict(property_data: dict) -> dict:
+    import pandas as pd
+
     bundle = _model_bundle()
     metadata = get_metadata()
     row = {column: property_data[column] for column in bundle["features"]}

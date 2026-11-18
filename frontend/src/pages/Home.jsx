@@ -286,6 +286,20 @@ function FeaturedProjectSlider() {
     return () => window.clearInterval(timer);
   }, [isPaused, heroSlides.length]);
 
+  useEffect(() => {
+    if (heroSlides.length < 2) return undefined;
+    const nextProject = heroSlides[(activeIndex + 1) % heroSlides.length];
+    if (!nextProject?.image) return undefined;
+
+    const timer = window.setTimeout(() => {
+      const image = new window.Image();
+      image.decoding = "async";
+      image.src = nextProject.image;
+    }, 1500);
+
+    return () => window.clearTimeout(timer);
+  }, [activeIndex, heroSlides.length]);
+
   if (heroSlides.length === 0) {
     return (
       <div className="flex min-h-[360px] items-center justify-center rounded-3xl bg-charcoal p-8 text-center text-white sm:min-h-[500px]">
@@ -321,10 +335,10 @@ function FeaturedProjectSlider() {
       {heroSlides.map((project, index) => (
         <img
           key={project.slug || `${project.name}-${index}`}
-          src={project.image || "/assets/property-placeholder.jpg"}
+          src={index === activeIndex ? project.image || "/assets/property-placeholder.jpg" : undefined}
           alt={`${safeText(project.name, "Featured property")}, ${safeText(project.type, "residential property")} in ${safeText(project.location, "Gurgaon")}`}
-          loading={index === 0 ? "eager" : "lazy"}
-          fetchPriority={index === 0 ? "high" : "auto"}
+          loading={index === activeIndex ? "eager" : "lazy"}
+          fetchPriority={index === activeIndex && activeIndex === 0 ? "high" : "auto"}
           aria-hidden={activeIndex !== index}
           className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-700 motion-reduce:transition-none ${
             activeIndex === index
